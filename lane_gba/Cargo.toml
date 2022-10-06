@@ -10,7 +10,7 @@ edition = "2018"
 agb = "0.11.1"
 
 [dev-dependencies]
-agb = { version = "0.11.1", features = ["testing"], path = ../agb/agb }
+agb = { version = "0.11.1", features = ["testing"], path = "../../agb/agb" }
 
 [profile.dev]
 opt-level = 2
