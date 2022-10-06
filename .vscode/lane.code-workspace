@@ -1,7 +1,7 @@
 {
 	"folders": [
 		{
-			"path": ".."
+			"path": "../lane_logic"
 		},
 		{
 			"path": "../lane_gba"
