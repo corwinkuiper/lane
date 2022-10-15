@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
 use super::{normal::Normal, Card};
@@ -18,7 +16,6 @@ impl Card for Score {
 
     fn can_place(
         _board: &Board,
-        _card: Self,
         _player: Player,
         _position: Position,
         _direction: Direction,
@@ -28,7 +25,6 @@ impl Card for Score {
 
     fn place(
         _board: &mut Board,
-        _card: Self,
         _player: Player,
         _position: Position,
         _direction: Direction,

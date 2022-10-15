@@ -5,14 +5,12 @@ trait Card: Default + core::fmt::Debug + Clone {
     fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus;
     fn can_place(
         board: &Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> PlaceStatus;
     fn place(
         board: &mut Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
@@ -33,7 +31,7 @@ macro_rules! create_card_data{
         }
 
         impl $type_name {
-            fn to_data(self) -> $name {
+            pub(crate) fn to_data(self) -> $name {
                 match self {
                     $( $type_name::$card_type => $name::$card_type(Default::default())),+
                 }
@@ -41,7 +39,7 @@ macro_rules! create_card_data{
         }
 
         impl $name {
-            fn to_type(&self) -> $type_name {
+            pub(crate) fn to_type(&self) -> $type_name {
                 match self {
                     $( $name::$card_type(_) => $type_name::$card_type),+
                 }
@@ -73,7 +71,7 @@ macro_rules! create_card_data{
                 direction: Direction,
             ) -> Set<Index> {
                 match card {
-                    $( $name::$card_type(card) => $card_type::place(board, card, player, position, direction)),+
+                    $( $name::$card_type(card) => $card_type::place(board, player, position, direction)),+
                 }
             }
 
@@ -85,7 +83,7 @@ macro_rules! create_card_data{
                 direction: Direction,
             ) -> PlaceStatus {
                 match card {
-                    $( $name::$card_type(card) => $card_type::can_place(board, card, player, position, direction)),+
+                    $( $name::$card_type(card) => $card_type::can_place(board, player, position, direction)),+
                 }
             }
 
@@ -105,6 +103,10 @@ macro_rules! create_card_data{
                     $name::$card_type(a) => a,
                     _ => panic!("you've got the wrong card!")
                 }
+            }
+
+            fn as_type() -> $type_name {
+                $type_name::$card_type
             }
 
         })+

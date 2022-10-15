@@ -15,7 +15,7 @@ use card::{CardData, CardType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PushStatus {
-    Success,
+    Success(u32),
     Fail,
 }
 
@@ -87,7 +87,20 @@ struct Hand {
 }
 
 impl State {
-    pub fn list_moves() {}
+    pub fn can_execute_move(&self, m: Move) -> bool {
+        match m {
+            Move::PlaceCard(place) => {
+                self.board
+                    .can_place(place.card, place.player, place.coordinate, place.direction)
+                    == PlaceStatus::Success
+            }
+            Move::PushCard(push) => match self.board.can_push(push.place, push.direction) {
+                PushStatus::Success(1..) => true,
+                PushStatus::Success(0) => false,
+                PushStatus::Fail => false,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -99,14 +112,22 @@ struct Board {
 struct Index(slotmap::DefaultKey);
 
 impl Board {
-    fn start_push(&mut self, position: Position, direction: Direction) -> Set<Index> {
-        let card = self.get_card_position(position);
+    fn start_push(&mut self, idx: Index, direction: Direction) -> Set<Index> {
+        CardData::push(self, idx, direction)
+    }
 
-        CardData::push(
-            self,
-            card.expect("should pass me something that exists"),
-            direction,
-        )
+    fn can_push(&self, idx: Index, direction: Direction) -> PushStatus {
+        CardData::can_push(self, idx, direction)
+    }
+
+    fn can_place(
+        &self,
+        card: CardType,
+        player: Player,
+        position: Position,
+        direction: Direction,
+    ) -> PlaceStatus {
+        CardData::can_place(self, card.to_data(), player, position, direction)
     }
 
     fn get_card(&self, idx: Index) -> Option<&PlacedCard> {
@@ -189,6 +210,7 @@ pub struct PlaceCardMove {
     direction: Direction,
     coordinate: Position,
     card: CardType,
+    player: Player,
 }
 
 pub struct PushCardMove {

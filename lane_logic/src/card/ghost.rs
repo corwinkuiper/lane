@@ -1,6 +1,6 @@
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
-use super::Card;
+use super::{normal::Normal, Card};
 
 #[derive(Debug, Clone, Default)]
 pub struct Ghost {}
@@ -22,26 +22,37 @@ impl Card for Ghost {
     }
 
     fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        PushStatus::Success
+        let my_position = board[self_index].position;
+        let next_position = my_position + direction;
+
+        // find index of next item
+        match board.get_card_position(next_position) {
+            Some(_) => PushStatus::Success(1),
+            None => PushStatus::Fail,
+        }
     }
 
     fn can_place(
         board: &Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> PlaceStatus {
-        todo!()
+        Normal::can_place(board, player, position, direction)
     }
 
     fn place(
         board: &mut Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> Set<Index> {
-        todo!()
+        super::normal::normal_placement(
+            board,
+            player,
+            position,
+            direction,
+            Self::as_type().to_data(),
+        )
     }
 }

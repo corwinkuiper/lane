@@ -1,6 +1,6 @@
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
-use super::{normal::Normal, Card, CardData};
+use super::{normal::Normal, Card};
 
 #[derive(Debug, Clone, Default)]
 pub struct Double {}
@@ -24,21 +24,25 @@ impl Card for Double {
 
     fn can_place(
         board: &Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> PlaceStatus {
-        todo!()
+        Normal::can_place(board, player, position, direction)
     }
 
     fn place(
         board: &mut Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> Set<Index> {
-        todo!()
+        super::normal::normal_placement(
+            board,
+            player,
+            position,
+            direction,
+            Self::as_type().to_data(),
+        )
     }
 }

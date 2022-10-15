@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
 use super::{Card, CardData};
@@ -37,32 +35,59 @@ impl Card for Normal {
 
         // find index of next item
         if let Some(next_index) = board.get_card_position(next_position) {
-            if CardData::can_push(board, next_index, direction) == PushStatus::Fail {
-                return PushStatus::Fail;
+            match CardData::can_push(board, next_index, direction) {
+                PushStatus::Success(n) => PushStatus::Success(n + 1),
+                PushStatus::Fail => PushStatus::Fail,
             }
+        } else {
+            PushStatus::Fail
         }
-
-        // yay, can push!
-        PushStatus::Success
     }
 
     fn can_place(
         board: &Board,
-        card: Self,
-        player: Player,
+        _player: Player,
         position: Position,
         direction: Direction,
     ) -> PlaceStatus {
-        PlaceStatus::Success
+        normal_placement_rule(board, position, direction)
     }
 
     fn place(
         board: &mut Board,
-        card: Self,
         player: Player,
         position: Position,
         direction: Direction,
     ) -> Set<Index> {
-        todo!()
+        normal_placement(
+            board,
+            player,
+            position,
+            direction,
+            Self::as_type().to_data(),
+        )
+    }
+}
+
+pub(crate) fn normal_placement(
+    board: &mut Board,
+    player: Player,
+    position: Position,
+    direction: Direction,
+    card_data: CardData,
+) -> Set<Index> {
+    let idx = board.add_card(player, position, card_data);
+    CardData::push(board, idx, direction)
+}
+
+pub(crate) fn normal_placement_rule(
+    board: &Board,
+    position: Position,
+    direction: Direction,
+) -> PlaceStatus {
+    if board.get_card_position(position + direction).is_some() {
+        PlaceStatus::Success
+    } else {
+        PlaceStatus::Fail
     }
 }
