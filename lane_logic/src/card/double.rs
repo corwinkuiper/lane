@@ -36,7 +36,7 @@ impl Card for Double {
         player: Player,
         position: Position,
         direction: Direction,
-    ) -> Set<Index> {
+    ) -> (Index, Set<Index>) {
         super::normal::normal_placement(
             board,
             player,

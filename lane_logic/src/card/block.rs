@@ -28,7 +28,7 @@ impl Card for Block {
         player: Player,
         position: Position,
         direction: Direction,
-    ) -> Set<Index> {
+    ) -> (Index, Set<Index>) {
         super::normal::normal_placement(
             board,
             player,

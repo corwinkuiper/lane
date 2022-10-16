@@ -28,7 +28,7 @@ impl Card for Score {
         _player: Player,
         _position: Position,
         _direction: Direction,
-    ) -> Set<Index> {
+    ) -> (Index, Set<Index>) {
         panic!("Woah! You can't try to place the score card. The score card is placed by the game not by you.")
     }
 }

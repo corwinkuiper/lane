@@ -1,5 +1,5 @@
 [package]
-name = "Lane"
+name = "lane"
 version = "0.1.0"
 authors = ["Corwin"]
 edition = "2018"
@@ -7,10 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-agb = "0.11.1"
-
-[dev-dependencies]
-agb = { version = "0.11.1", features = ["testing"], path = "../../agb/agb" }
+agb = { version = "0.12.1", features = ["testing"], path = "../../agb/agb" }
+slotmap = { version = "1.0", default-features = false }
+lane_logic = { path = "../lane_logic" }
 
 [profile.dev]
 opt-level = 2

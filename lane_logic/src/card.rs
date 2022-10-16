@@ -14,7 +14,7 @@ trait Card: Default + core::fmt::Debug + Clone {
         player: Player,
         position: Position,
         direction: Direction,
-    ) -> Set<Index>;
+    ) -> (Index, Set<Index>);
 }
 
 macro_rules! create_card_data{
@@ -39,7 +39,7 @@ macro_rules! create_card_data{
         }
 
         impl $name {
-            pub(crate) fn to_type(&self) -> $type_name {
+            pub fn to_type(&self) -> $type_name {
                 match self {
                     $( $name::$card_type(_) => $type_name::$card_type),+
                 }
@@ -65,25 +65,25 @@ macro_rules! create_card_data{
 
             pub(crate) fn place(
                 board: &mut Board,
-                card: Self,
+                card: $type_name,
                 player: Player,
                 position: Position,
                 direction: Direction,
-            ) -> Set<Index> {
+            ) -> (Index, Set<Index>) {
                 match card {
-                    $( $name::$card_type(card) => $card_type::place(board, player, position, direction)),+
+                    $( $type_name::$card_type => $card_type::place(board, player, position, direction)),+
                 }
             }
 
             pub(crate) fn can_place(
                 board: &Board,
-                card: Self,
+                card: $type_name,
                 player: Player,
                 position: Position,
                 direction: Direction,
             ) -> PlaceStatus {
                 match card {
-                    $( $name::$card_type(card) => $card_type::can_place(board, player, position, direction)),+
+                    $( $type_name::$card_type => $card_type::can_place(board, player, position, direction)),+
                 }
             }
 

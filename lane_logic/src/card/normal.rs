@@ -58,7 +58,7 @@ impl Card for Normal {
         player: Player,
         position: Position,
         direction: Direction,
-    ) -> Set<Index> {
+    ) -> (Index, Set<Index>) {
         normal_placement(
             board,
             player,
@@ -75,9 +75,9 @@ pub(crate) fn normal_placement(
     position: Position,
     direction: Direction,
     card_data: CardData,
-) -> Set<Index> {
+) -> (Index, Set<Index>) {
     let idx = board.add_card(player, position, card_data);
-    CardData::push(board, idx, direction)
+    (idx, CardData::push(board, idx, direction))
 }
 
 pub(crate) fn normal_placement_rule(
