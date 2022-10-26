@@ -68,34 +68,73 @@ struct MyState<'controller> {
     cards: SecondaryMap<DefaultKey, CardOnBoard<'controller>>,
     playing_animations: Vec<Vec<(Index, CardAnimationStatus)>>,
     game_state: State,
-}
-
-struct CardOnBoard<'controller> {
-    card_object: Object<'controller>,
-    colour_object: Option<Object<'controller>>,
-    position: Vector2D<Num<i32, 8>>,
-    counts_to_average: bool,
-}
-
-enum CardAnimationStatus {
-    Placed(Vector2D<Num<i32, 8>>),
-    MoveTowards(Vector2D<Num<i32, 8>>),
-    Dying,
-}
-
-struct SelectBox<'controller> {
-    position: Vector2D<i32>,
-    object: Object<'controller>,
-    state: SelectState,
-}
-
-enum SelectState {
-    Hand,
-    BoardPush,
-    Place,
+    select: SelectBox<'controller>,
+    camera_position: Vector2D<Num<i32, 8>>,
 }
 
 impl<'controller> MyState<'controller> {
+    #[track_caller]
+    fn average_position(&self) -> Vector2D<Num<i32, 8>> {
+        let average_position: Vector2D<Num<i32, 8>> = self
+            .cards
+            .iter()
+            .filter(|(_, card)| card.counts_to_average)
+            .map(|(_, a)| a.position)
+            .reduce(|a, b| a + b)
+            .unwrap()
+            / self.cards.len() as i32;
+        average_position
+    }
+
+    fn new(initial_state: State, object: &'controller ObjectController) -> Self {
+        let mut state = MyState {
+            cards: Default::default(),
+            playing_animations: Default::default(),
+            game_state: initial_state,
+            select: SelectBox {
+                object: object.object_sprite(SELECT),
+                state: SelectState::Hand { slot: 0 },
+            },
+            camera_position: Default::default(),
+        };
+
+        for (idx, card) in state.game_state.board_state() {
+            state.cards.insert(
+                idx.to_slotmap_key(),
+                CardOnBoard {
+                    card_object: object.object_sprite(card_type_to_sprite(card.card.to_type())),
+                    colour_object: card
+                        .belonging_player
+                        .map(|p| object.object_sprite(colour_for_player(p))),
+                    position: CONVERSION_FACTOR.hadamard(card.position.0.change_base()),
+                    counts_to_average: true,
+                },
+            );
+        }
+        state.camera_position = state.average_position();
+
+        state
+    }
+
+    fn frame(&mut self, object: &'controller ObjectController, input: &ButtonController) {
+        self.camera_position = (self.camera_position * 4 + self.average_position()) / 5;
+
+        let position_difference: Vector2D<Num<i32, 8>> =
+            Vector2D::new(WIDTH, HEIGHT).change_base() / 2 - self.camera_position;
+
+        self.update_animation();
+
+        for (_, board_card) in self.cards.iter_mut() {
+            let pos = (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
+            board_card.card_object.set_position(pos);
+            board_card.card_object.show();
+            if let Some(colour) = &mut board_card.colour_object {
+                colour.set_position(pos);
+                colour.set_z(1);
+            }
+        }
+    }
+
     fn update_representation(&mut self, update: MoveResult, object: &'controller ObjectController) {
         // add the newly placed cards
         for (idx, direction, new_card) in &update.placed {
@@ -217,6 +256,30 @@ impl<'controller> MyState<'controller> {
     }
 }
 
+struct CardOnBoard<'controller> {
+    card_object: Object<'controller>,
+    colour_object: Option<Object<'controller>>,
+    position: Vector2D<Num<i32, 8>>,
+    counts_to_average: bool,
+}
+
+enum CardAnimationStatus {
+    Placed(Vector2D<Num<i32, 8>>),
+    MoveTowards(Vector2D<Num<i32, 8>>),
+    Dying,
+}
+
+struct SelectBox<'controller> {
+    object: Object<'controller>,
+    state: SelectState,
+}
+
+enum SelectState {
+    Hand { slot: usize },
+    BoardPush { position: Vector2D<i32> },
+    Place { position: Vector2D<i32> },
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CompletedAnimation {
     Completed,
@@ -234,7 +297,7 @@ fn battle(gba: &mut agb::Gba) {
     let vblank = VBlank::get();
     let mut input = ButtonController::new();
 
-    let mut game_state = State::new(
+    let game_state = State::new(
         alloc::vec![
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
@@ -250,27 +313,7 @@ fn battle(gba: &mut agb::Gba) {
         Player::A,
     );
 
-    let my_board_state: SecondaryMap<DefaultKey, CardOnBoard> = SecondaryMap::new();
-
-    let mut state = MyState {
-        cards: my_board_state,
-        playing_animations: Vec::new(),
-        game_state,
-    };
-
-    for (idx, card) in state.game_state.board_state() {
-        state.cards.insert(
-            idx.to_slotmap_key(),
-            CardOnBoard {
-                card_object: object.object_sprite(card_type_to_sprite(card.card.to_type())),
-                colour_object: card
-                    .belonging_player
-                    .map(|p| object.object_sprite(colour_for_player(p))),
-                position: CONVERSION_FACTOR.hadamard(card.position.0.change_base()),
-                counts_to_average: true,
-            },
-        );
-    }
+    let mut state = MyState::new(game_state, &object);
 
     let update = state
         .game_state
@@ -282,59 +325,11 @@ fn battle(gba: &mut agb::Gba) {
 
     state.update_representation(update, &object);
 
-    let mut select_box = SelectBox {
-        position: (0, 0).into(),
-        object: object.object_sprite(SELECT),
-        state: SelectState::BoardPush,
-    };
-
-    select_box.object.set_z(-1);
-
     loop {
         vblank.wait_for_vblank();
         object.commit();
-
         input.update();
 
-        select_box.position += (
-            (input.is_just_pressed(Button::RIGHT) as i32
-                - input.is_just_pressed(Button::LEFT) as i32),
-            (input.is_just_pressed(Button::DOWN) as i32 - input.is_just_pressed(Button::UP) as i32),
-        )
-            .into();
-
-        let average_position: Vector2D<Num<i32, 8>> = state
-            .cards
-            .iter()
-            .filter(|(_, card)| card.counts_to_average)
-            .map(|(_, a)| a.position)
-            .reduce(|a, b| a + b)
-            .unwrap()
-            / state.cards.len() as i32;
-
-        let position_difference: Vector2D<Num<i32, 8>> =
-            Vector2D::new(WIDTH, HEIGHT).change_base() / 2 - average_position;
-
-        select_box.object.set_position(
-            (select_box
-                .position
-                .change_base()
-                .hadamard(CONVERSION_FACTOR)
-                + position_difference
-                - CONVERSION_FACTOR / 2)
-                .floor(),
-        );
-
-        state.update_animation();
-
-        for (_, board_card) in state.cards.iter_mut() {
-            let pos = (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
-            board_card.card_object.set_position(pos);
-            board_card.card_object.show();
-            if let Some(colour) = &mut board_card.colour_object {
-                colour.set_position(pos);
-                colour.set_z(1);
-            }
-        }
+        state.frame(&object, &input);
     }
 }
