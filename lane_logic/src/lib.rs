@@ -101,7 +101,7 @@ impl State {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
                 HeldCard::Avaliable(card) => {
                     self.board
-                        .can_place(card, place.player, place.coordinate, place.direction)
+                        .can_place(card, self.turn, place.coordinate, place.direction)
                         == PlaceStatus::Success
                 }
                 HeldCard::Waiting {
@@ -123,32 +123,41 @@ impl State {
                 HeldCard::Avaliable(card) => {
                     self.hands[self.turn as usize].cards.remove(place.card.0);
 
-                    let (new_card, moved_cards) = self.board.start_place(
-                        card,
-                        place.player,
-                        place.coordinate,
-                        place.direction,
-                    );
+                    let (new_card, moved_cards) =
+                        self.board
+                            .start_place(card, self.turn, place.coordinate, place.direction);
 
-                    (Some(new_card), moved_cards)
+                    (
+                        alloc::vec![(
+                            new_card,
+                            place.direction,
+                            PlacedCard {
+                                belonging_player: Some(self.turn),
+                                position: place.coordinate,
+                                card: card.to_data()
+                            }
+                        )],
+                        moved_cards,
+                    )
                 }
                 HeldCard::Waiting {
                     card: _,
                     turns_until_usable: _,
                 } => panic!("invalid move"),
             },
-            Move::PushCard(push) => (None, self.board.start_push(push.place, push.direction)),
+            Move::PushCard(push) => (
+                Vec::new(),
+                self.board.start_push(push.place, push.direction),
+            ),
         };
+
+        let moved = moved
+            .iter()
+            .map(|&idx| (idx, self.board[idx].clone()))
+            .collect();
 
         let removed = self.board.remove_cards();
 
-        let placed = match placed {
-            Some(placed) => alloc::vec![placed],
-            None => Vec::new(),
-        };
-
-        let moved = moved.iter().cloned().collect();
-        let removed = removed.iter().map(|(idx, _)| idx).cloned().collect();
         let winner = None;
 
         self.turn = match self.turn {
@@ -184,6 +193,10 @@ impl State {
         self.board
             .get_card_position(pos)
             .map(|i| (i, &self.board[i]))
+    }
+
+    pub fn card(&self, idx: Index) -> Option<&PlacedCard> {
+        self.board.get_card(idx)
     }
 }
 
@@ -334,7 +347,6 @@ pub struct PlaceCardMove {
     pub direction: Direction,
     pub coordinate: Position,
     pub card: HeldCardIndex,
-    pub player: Player,
 }
 
 pub struct PushCardMove {
@@ -348,9 +360,9 @@ pub enum Move {
 }
 
 pub struct MoveResult {
-    pub placed: Vec<Index>,
-    pub moved: Vec<Index>,
-    pub removed: Vec<Index>,
+    pub placed: Vec<(Index, Direction, PlacedCard)>,
+    pub moved: Vec<(Index, PlacedCard)>,
+    pub removed: Vec<(Index, PlacedCard)>,
     pub winner: Option<Player>,
 }
 
