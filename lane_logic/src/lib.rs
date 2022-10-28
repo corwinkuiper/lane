@@ -1,6 +1,7 @@
 #![no_std]
 #[warn(clippy::all)]
 use core::ops::Add;
+use core::ops::Neg;
 
 use agb_fixnum::Vector2D;
 
@@ -42,6 +43,19 @@ impl Direction {
             Direction::West => (-1, 0),
         }
         .into()
+    }
+}
+
+impl Neg for Direction {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Direction::North => Direction::South,
+            Direction::East => Direction::West,
+            Direction::South => Direction::North,
+            Direction::West => Direction::East,
+        }
     }
 }
 
@@ -101,19 +115,27 @@ impl State {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
                 HeldCard::Avaliable(card) => {
                     self.board
-                        .can_place(card, self.turn, place.coordinate, place.direction)
-                        == PlaceStatus::Success
+                        .no_cards_in_direction(place.coordinate, -place.direction)
+                        && self
+                            .board
+                            .can_place(card, self.turn, place.coordinate, place.direction)
+                            == PlaceStatus::Success
                 }
                 HeldCard::Waiting {
                     card: _,
                     turns_until_usable: _,
                 } => false,
             },
-            Move::PushCard(push) => match self.board.can_push(push.place, push.direction) {
-                PushStatus::Success(1..) => true,
-                PushStatus::Success(0) => false,
-                PushStatus::Fail => false,
-            },
+            Move::PushCard(push) => {
+                self.board
+                    .get_card(push.place)
+                    .map_or(false, |c| c.belonging_player == Some(self.turn))
+                    && match self.board.can_push(push.place, push.direction) {
+                        PushStatus::Success(1..) => true,
+                        PushStatus::Success(0) => false,
+                        PushStatus::Fail => false,
+                    }
+            }
         }
     }
 
@@ -324,6 +346,35 @@ impl Board {
             .iter()
             .map(|&idx| (idx, self.positions.remove(idx.0).unwrap()))
             .collect()
+    }
+
+    fn no_cards_in_direction(&self, position: Position, direction: Direction) -> bool {
+        for (_, card) in self.positions.iter() {
+            match direction {
+                Direction::North => {
+                    if card.position.0.x == position.0.x && card.position.0.y < position.0.y {
+                        return false;
+                    }
+                }
+                Direction::East => {
+                    if card.position.0.y == position.0.y && card.position.0.x > position.0.x {
+                        return false;
+                    }
+                }
+                Direction::South => {
+                    if card.position.0.x == position.0.x && card.position.0.y > position.0.y {
+                        return false;
+                    }
+                }
+                Direction::West => {
+                    if card.position.0.y == position.0.y && card.position.0.x < position.0.x {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
