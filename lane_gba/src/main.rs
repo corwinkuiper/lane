@@ -10,7 +10,7 @@ use agb::{
         object::{Graphics, Object, ObjectController, Sprite, Tag},
         HEIGHT, WIDTH,
     },
-    fixnum::{Num, Vector2D},
+    fixnum::{Num, Rect, Vector2D},
     include_aseprite,
     input::{Button, ButtonController},
     interrupt::VBlank,
@@ -24,7 +24,14 @@ use slotmap::{DefaultKey, SecondaryMap};
 
 extern crate alloc;
 
-const CARDS: &Graphics = include_aseprite!("gfx/cards.aseprite");
+const CARDS: &Graphics = include_aseprite!(
+    "gfx/cards.aseprite",
+    "gfx/arrow-right.aseprite",
+    "gfx/arrow-up.aseprite"
+);
+
+const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
+const ARROW_UP: &Sprite = CARDS.tags().get("Arrow Up").sprite(0);
 
 const SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
 
@@ -93,7 +100,7 @@ impl<'controller> MyState<'controller> {
             game_state: initial_state,
             select: SelectBox {
                 object: object.object_sprite(SELECT),
-                state: SelectState::Hand { slot: 0 },
+                state_stack: alloc::vec![SelectState::Hand { slot: 0 }],
             },
             camera_position: Default::default(),
         };
@@ -117,21 +124,49 @@ impl<'controller> MyState<'controller> {
     }
 
     fn frame(&mut self, object: &'controller ObjectController, input: &ButtonController) {
+        // progress the animations
+        self.update_animation();
+
+        // Update rendered position of objects
         self.camera_position = (self.camera_position * 4 + self.average_position()) / 5;
 
         let position_difference: Vector2D<Num<i32, 8>> =
             Vector2D::new(WIDTH, HEIGHT).change_base() / 2 - self.camera_position;
 
-        self.update_animation();
+        let screen_space = Rect::new((0, 0).into(), Vector2D::new(WIDTH, HEIGHT).change_base());
 
         for (_, board_card) in self.cards.iter_mut() {
             let pos = (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
             board_card.card_object.set_position(pos);
-            board_card.card_object.show();
+            let bounding = Rect::new(pos, CONVERSION_FACTOR.floor());
+            if bounding.touches(&screen_space) {
+                board_card.card_object.show();
+            } else {
+                board_card.card_object.hide();
+            }
             if let Some(colour) = &mut board_card.colour_object {
                 colour.set_position(pos);
                 colour.set_z(1);
             }
+        }
+
+        // process the select box
+    }
+
+    fn update_select_box(
+        &mut self,
+        camera_position: Vector2D<Num<i32, 8>>,
+        input: &ButtonController,
+    ) {
+        let input_vector = Vector2D::new(input.x_tri() as i32, input.y_tri() as i32);
+
+        match self.select.state_mut() {
+            SelectState::Hand { slot } => {
+                *slot = (*slot as i32 + input_vector.x) as usize;
+            }
+            SelectState::BoardSelectPosition { position, reason } => todo!(),
+            SelectState::BoardSelectPushDirection { position } => todo!(),
+            SelectState::BoardSelectPlaceDirection { position } => todo!(),
         }
     }
 
@@ -271,13 +306,42 @@ enum CardAnimationStatus {
 
 struct SelectBox<'controller> {
     object: Object<'controller>,
-    state: SelectState,
+    state_stack: Vec<SelectState>,
+}
+
+impl SelectBox<'_> {
+    fn state_mut(&mut self) -> &mut SelectState {
+        self.state_stack
+            .last_mut()
+            .expect("should have the last state available")
+    }
+
+    fn state(&self) -> &SelectState {
+        self.state_stack
+            .last()
+            .expect("should have the last state available")
+    }
+}
+
+enum BoardSelect {
+    Push,
+    Place,
 }
 
 enum SelectState {
-    Hand { slot: usize },
-    BoardPush { position: Vector2D<i32> },
-    Place { position: Vector2D<i32> },
+    Hand {
+        slot: usize,
+    },
+    BoardSelectPosition {
+        position: Vector2D<i32>,
+        reason: BoardSelect,
+    },
+    BoardSelectPushDirection {
+        position: Vector2D<i32>,
+    },
+    BoardSelectPlaceDirection {
+        position: Vector2D<i32>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -287,8 +351,8 @@ enum CompletedAnimation {
 }
 
 const CONVERSION_FACTOR: Vector2D<Num<i32, 8>> = Vector2D {
-    x: Num::from_raw(32 << 8),
-    y: Num::from_raw(32 << 8),
+    x: Num::from_raw(16 << 8),
+    y: Num::from_raw(16 << 8),
 };
 
 fn battle(gba: &mut agb::Gba) {
