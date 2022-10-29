@@ -274,6 +274,8 @@ impl<'controller> MyState<'controller> {
                     self.select_arrow = None;
                 }
                 if input.is_just_released(Button::A) {
+                    self.select.state_stack.pop();
+
                     if let Some(direction) = direction {
                         // execute a move!
                         let desired_move = (|| match reason {
@@ -298,7 +300,6 @@ impl<'controller> MyState<'controller> {
                             // play invalid move sound
                         }
                     }
-                    self.select.state_stack.pop();
                 }
             }
         }
