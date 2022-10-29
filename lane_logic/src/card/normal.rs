@@ -40,7 +40,7 @@ impl Card for Normal {
                 PushStatus::Fail => PushStatus::Fail,
             }
         } else {
-            PushStatus::Fail
+            PushStatus::Success(0)
         }
     }
 

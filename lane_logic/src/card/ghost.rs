@@ -22,14 +22,7 @@ impl Card for Ghost {
     }
 
     fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        let my_position = board[self_index].position;
-        let next_position = my_position + direction;
-
-        // find index of next item
-        match board.get_card_position(next_position) {
-            Some(_) => PushStatus::Success(1),
-            None => PushStatus::Fail,
-        }
+        PushStatus::Success(0)
     }
 
     fn can_place(

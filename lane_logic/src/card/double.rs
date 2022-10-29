@@ -1,6 +1,6 @@
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
-use super::{normal::Normal, Card};
+use super::{normal::Normal, Card, CardData};
 
 #[derive(Debug, Clone, Default)]
 pub struct Double {}
@@ -19,7 +19,25 @@ impl Card for Double {
     }
 
     fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        Normal::can_push(board, self_index, direction)
+        match Normal::can_push(board, self_index, direction) {
+            PushStatus::Success(n @ 1..) => PushStatus::Success(n),
+            PushStatus::Success(0) | PushStatus::Fail => {
+                // check if our double push can push
+
+                let my_position = board[self_index].position;
+                let next_position = my_position + direction + direction;
+
+                // find index of next item
+                if let Some(next_index) = board.get_card_position(next_position) {
+                    match CardData::can_push(board, next_index, direction) {
+                        PushStatus::Success(n) => PushStatus::Success(n + 1),
+                        PushStatus::Fail => PushStatus::Success(0),
+                    }
+                } else {
+                    PushStatus::Success(0)
+                }
+            }
+        }
     }
 
     fn can_place(
