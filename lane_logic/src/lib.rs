@@ -44,6 +44,16 @@ impl Direction {
         }
         .into()
     }
+
+    pub fn from_vector(v: Vector2D<i32>) -> Option<Self> {
+        match (v.x, v.y) {
+            (0, -1) => Some(Direction::North),
+            (1, 0) => Some(Direction::East),
+            (0, 1) => Some(Direction::South),
+            (-1, 0) => Some(Direction::West),
+            _ => None,
+        }
+    }
 }
 
 impl Neg for Direction {
@@ -110,6 +120,10 @@ impl Hand {
 }
 
 impl State {
+    pub fn turn(&self) -> Player {
+        self.turn
+    }
+
     pub fn can_execute_move(&self, m: Move) -> bool {
         match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {

@@ -7,7 +7,7 @@
 
 use agb::{
     display::{
-        object::{Graphics, Object, ObjectController, Sprite, Tag},
+        object::{self, Graphics, Object, ObjectController, Sprite, Tag},
         HEIGHT, WIDTH,
     },
     fixnum::{Num, Rect, Vector2D},
@@ -27,11 +27,11 @@ extern crate alloc;
 const CARDS: &Graphics = include_aseprite!(
     "gfx/cards.aseprite",
     "gfx/arrow-right.aseprite",
-    "gfx/arrow-up.aseprite"
+    "gfx/arrow-down.aseprite"
 );
 
 const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
-const ARROW_UP: &Sprite = CARDS.tags().get("Arrow Up").sprite(0);
+const ARROW_DOWN: &Sprite = CARDS.tags().get("Arrow Down").sprite(0);
 
 const SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
 
@@ -77,6 +77,7 @@ struct MyState<'controller> {
     game_state: State,
     select: SelectBox<'controller>,
     camera_position: Vector2D<Num<i32, 8>>,
+    select_arrow: Option<Object<'controller>>,
 }
 
 impl<'controller> MyState<'controller> {
@@ -102,6 +103,7 @@ impl<'controller> MyState<'controller> {
                 object: object.object_sprite(SELECT),
                 state_stack: alloc::vec![SelectState::Hand { slot: 0 }],
             },
+            select_arrow: None,
             camera_position: Default::default(),
         };
 
@@ -151,22 +153,112 @@ impl<'controller> MyState<'controller> {
         }
 
         // process the select box
+        self.update_select_box(position_difference, input, object);
     }
 
     fn update_select_box(
         &mut self,
         camera_position: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
+        controller: &'controller ObjectController,
     ) {
-        let input_vector = Vector2D::new(input.x_tri() as i32, input.y_tri() as i32);
+        let input_vector: Vector2D<i32> = input.just_pressed_vector();
 
         match self.select.state_mut() {
             SelectState::Hand { slot } => {
-                *slot = (*slot as i32 + input_vector.x) as usize;
+                *slot = (*slot as i32 + input_vector.x)
+                    .rem_euclid(self.game_state.player_hand(self.game_state.turn()).len() as i32)
+                    as usize;
+
+                if input.is_just_pressed(Button::L) {
+                    agb::println!("Pressed L");
+                    self.select
+                        .state_stack
+                        .push(SelectState::BoardSelectPosition {
+                            position: (0, 0).into(),
+                            reason: BoardSelect::Push,
+                        });
+                }
             }
-            SelectState::BoardSelectPosition { position, reason } => todo!(),
-            SelectState::BoardSelectPushDirection { position } => todo!(),
-            SelectState::BoardSelectPlaceDirection { position } => todo!(),
+            SelectState::BoardSelectPosition { position, reason } => {
+                *position += input_vector;
+                let position = *position;
+                if input.is_just_pressed(Button::A) {
+                    match *reason {
+                        BoardSelect::Push => self
+                            .select
+                            .state_stack
+                            .push(SelectState::BoardSelectPushDirection { position }),
+                        BoardSelect::Place => self
+                            .select
+                            .state_stack
+                            .push(SelectState::BoardSelectPlaceDirection {}),
+                    }
+                } else if input.is_just_pressed(Button::B) {
+                    self.select.state_stack.pop();
+                }
+                self.select.object.set_position(
+                    (position.change_base().hadamard(CONVERSION_FACTOR) + camera_position
+                        - CONVERSION_FACTOR / 2)
+                        .floor(),
+                );
+            }
+            SelectState::BoardSelectPushDirection { position } => {
+                let direction = Direction::from_vector(input.vector());
+
+                if input.is_pressed(Button::A) {
+                    let object = self
+                        .select_arrow
+                        .get_or_insert_with(|| controller.object_sprite(ARROW_RIGHT));
+
+                    object.set_z(-1);
+                    match direction {
+                        Some(direction) => {
+                            let adjustment = match direction {
+                                Direction::North => {
+                                    object.set_sprite(controller.sprite(ARROW_DOWN));
+                                    object.set_hflip(false);
+                                    object.set_vflip(true);
+                                    (4, 32)
+                                }
+                                Direction::East => {
+                                    object.set_sprite(controller.sprite(ARROW_RIGHT));
+                                    object.set_hflip(false);
+                                    object.set_vflip(false);
+                                    (0, 4)
+                                }
+                                Direction::South => {
+                                    object.set_sprite(controller.sprite(ARROW_DOWN));
+                                    object.set_hflip(false);
+                                    object.set_vflip(false);
+                                    (4, 0)
+                                }
+                                Direction::West => {
+                                    object.set_sprite(controller.sprite(ARROW_RIGHT));
+                                    object.set_hflip(true);
+                                    object.set_vflip(false);
+                                    (32, 4)
+                                }
+                            }
+                            .into();
+                            object.set_position(
+                                (position.change_base().hadamard(CONVERSION_FACTOR)
+                                    + camera_position)
+                                    .floor()
+                                    - adjustment,
+                            );
+                            object.show();
+                        }
+                        None => {
+                            object.hide();
+                        }
+                    }
+                } else {
+                    self.select_arrow = None;
+                    self.select.state_stack.pop();
+                }
+            }
+            SelectState::BoardSelectPlaceDirection {} => todo!(),
         }
     }
 
@@ -339,9 +431,7 @@ enum SelectState {
     BoardSelectPushDirection {
         position: Vector2D<i32>,
     },
-    BoardSelectPlaceDirection {
-        position: Vector2D<i32>,
-    },
+    BoardSelectPlaceDirection {},
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
