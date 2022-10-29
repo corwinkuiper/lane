@@ -18,7 +18,7 @@ use agb::{
 use alloc::vec::Vec;
 use lane_logic::{
     card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PlaceCardMove,
-    Player, Position, State,
+    Player, Position, PushCardMove, State,
 };
 use slotmap::{DefaultKey, SecondaryMap};
 
@@ -153,7 +153,18 @@ impl<'controller> MyState<'controller> {
         }
 
         // process the select box
-        self.update_select_box(position_difference, input, object);
+        if let Some(desired_move) = self.update_select_box(position_difference, input, object) {
+            // validate the move is possible
+            if self.game_state.can_execute_move(&desired_move) {
+                // woah!
+                let result = self.game_state.execute_move(&desired_move);
+                self.update_representation(result, object);
+                self.select.state_stack.clear();
+                self.select.state_stack.push(SelectState::Hand { slot: 0 });
+            } else {
+                // play invalid move sound
+            }
+        }
     }
 
     fn update_select_box(
@@ -161,7 +172,7 @@ impl<'controller> MyState<'controller> {
         position_difference: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
         controller: &'controller ObjectController,
-    ) {
+    ) -> Option<Move> {
         let input_vector: Vector2D<i32> = input.just_pressed_vector();
 
         match self.select.state_mut() {
@@ -178,22 +189,26 @@ impl<'controller> MyState<'controller> {
                             position: (0, 0).into(),
                             reason: BoardSelect::Push,
                         });
+                } else if input.is_just_pressed(Button::A) {
+                    let slot = *slot;
+                    agb::println!("Pressed A on card {}", slot);
+                    self.select
+                        .state_stack
+                        .push(SelectState::BoardSelectPosition {
+                            position: (0, 0).into(),
+                            reason: BoardSelect::Place(slot),
+                        });
                 }
             }
             SelectState::BoardSelectPosition { position, reason } => {
                 *position += input_vector;
                 let position = *position;
+                let reason = *reason;
+
                 if input.is_just_pressed(Button::A) {
-                    match *reason {
-                        BoardSelect::Push => self
-                            .select
-                            .state_stack
-                            .push(SelectState::BoardSelectPushDirection { position }),
-                        BoardSelect::Place => self
-                            .select
-                            .state_stack
-                            .push(SelectState::BoardSelectPlaceDirection {}),
-                    }
+                    self.select
+                        .state_stack
+                        .push(SelectState::BoardSelectDirection { position, reason });
                 } else if input.is_just_pressed(Button::B) {
                     self.select.state_stack.pop();
                 }
@@ -203,8 +218,10 @@ impl<'controller> MyState<'controller> {
                         .floor(),
                 );
             }
-            SelectState::BoardSelectPushDirection { position } => {
+            SelectState::BoardSelectDirection { position, reason } => {
                 let direction = Direction::from_vector(input.vector());
+                let reason = *reason;
+                let position = *position;
 
                 if input.is_pressed(Button::A) {
                     let object = self
@@ -255,11 +272,38 @@ impl<'controller> MyState<'controller> {
                     }
                 } else {
                     self.select_arrow = None;
+                }
+                if input.is_just_released(Button::A) {
+                    if let Some(direction) = direction {
+                        // execute a move!
+                        let desired_move = (|| match reason {
+                            BoardSelect::Push => {
+                                let (card, _place) =
+                                    self.game_state.card_at_position(Position(position))?;
+                                Some(Move::PushCard(PushCardMove {
+                                    place: card,
+                                    direction,
+                                }))
+                            }
+                            BoardSelect::Place(index) => Some(Move::PlaceCard(PlaceCardMove {
+                                direction,
+                                coordinate: Position(position),
+                                card: HeldCardIndex(index),
+                            })),
+                        })();
+
+                        if let Some(desired_move) = desired_move {
+                            return Some(desired_move);
+                        } else {
+                            // play invalid move sound
+                        }
+                    }
                     self.select.state_stack.pop();
                 }
             }
-            SelectState::BoardSelectPlaceDirection {} => todo!(),
         }
+
+        None
     }
 
     fn update_representation(&mut self, update: MoveResult, object: &'controller ObjectController) {
@@ -415,11 +459,13 @@ impl SelectBox<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum BoardSelect {
     Push,
-    Place,
+    Place(usize),
 }
 
+#[derive(Debug, Clone, Copy)]
 enum SelectState {
     Hand {
         slot: usize,
@@ -428,10 +474,10 @@ enum SelectState {
         position: Vector2D<i32>,
         reason: BoardSelect,
     },
-    BoardSelectPushDirection {
+    BoardSelectDirection {
         position: Vector2D<i32>,
+        reason: BoardSelect,
     },
-    BoardSelectPlaceDirection {},
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -471,7 +517,7 @@ fn battle(gba: &mut agb::Gba) {
 
     let update = state
         .game_state
-        .execute_move(Move::PlaceCard(PlaceCardMove {
+        .execute_move(&Move::PlaceCard(PlaceCardMove {
             direction: Direction::East,
             coordinate: Position((-1, 0).into()),
             card: HeldCardIndex(0),

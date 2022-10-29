@@ -124,12 +124,13 @@ impl State {
         self.turn
     }
 
-    pub fn can_execute_move(&self, m: Move) -> bool {
+    pub fn can_execute_move(&self, m: &Move) -> bool {
         match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
                 HeldCard::Avaliable(card) => {
                     self.board
                         .no_cards_in_direction(place.coordinate, -place.direction)
+                        && self.board.get_card_position(place.coordinate).is_none()
                         && self
                             .board
                             .can_place(card, self.turn, place.coordinate, place.direction)
@@ -153,7 +154,7 @@ impl State {
         }
     }
 
-    pub fn execute_move(&mut self, m: Move) -> MoveResult {
+    pub fn execute_move(&mut self, m: &Move) -> MoveResult {
         let (placed, moved) = match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
                 HeldCard::Avaliable(card) => {
@@ -341,7 +342,8 @@ impl Board {
         ]
         .map(|v| {
             v.map_or(false, |idx| {
-                self.get_card(idx).unwrap().belonging_player != my_player
+                let card = self.get_card(idx).unwrap().belonging_player;
+                card.is_some() && card != my_player
             })
         });
 
@@ -415,8 +417,8 @@ pub struct PlaceCardMove {
 }
 
 pub struct PushCardMove {
-    place: Index,
-    direction: Direction,
+    pub place: Index,
+    pub direction: Direction,
 }
 
 pub enum Move {
