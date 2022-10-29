@@ -14,6 +14,7 @@ use agb::{
     include_aseprite,
     input::{Button, ButtonController},
     interrupt::VBlank,
+    sound::mixer::{Frequency, Mixer, SoundChannel},
 };
 use alloc::vec::Vec;
 use lane_logic::{
@@ -21,6 +22,8 @@ use lane_logic::{
     Player, Position, PushCardMove, State,
 };
 use slotmap::{DefaultKey, SecondaryMap};
+
+const INCORRECT: &[u8] = agb::include_wav!("sfx/incorrect.wav");
 
 extern crate alloc;
 
@@ -125,7 +128,12 @@ impl<'controller> MyState<'controller> {
         state
     }
 
-    fn frame(&mut self, object: &'controller ObjectController, input: &ButtonController) {
+    fn frame(
+        &mut self,
+        object: &'controller ObjectController,
+        input: &ButtonController,
+        mixer: &mut Mixer,
+    ) {
         // progress the animations
         self.update_animation();
 
@@ -153,7 +161,9 @@ impl<'controller> MyState<'controller> {
         }
 
         // process the select box
-        if let Some(desired_move) = self.update_select_box(position_difference, input, object) {
+        if let Some(desired_move) =
+            self.update_select_box(position_difference, input, object, mixer)
+        {
             // validate the move is possible
             if self.game_state.can_execute_move(&desired_move) {
                 // woah!
@@ -162,7 +172,7 @@ impl<'controller> MyState<'controller> {
                 self.select.state_stack.clear();
                 self.select.state_stack.push(SelectState::Hand { slot: 0 });
             } else {
-                // play invalid move sound
+                mixer.play_sound(SoundChannel::new(INCORRECT));
             }
         }
     }
@@ -172,6 +182,7 @@ impl<'controller> MyState<'controller> {
         position_difference: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
         controller: &'controller ObjectController,
+        mixer: &mut Mixer,
     ) -> Option<Move> {
         let input_vector: Vector2D<i32> = input.just_pressed_vector();
 
@@ -297,7 +308,7 @@ impl<'controller> MyState<'controller> {
                         if let Some(desired_move) = desired_move {
                             return Some(desired_move);
                         } else {
-                            // play invalid move sound
+                            mixer.play_sound(SoundChannel::new(INCORRECT));
                         }
                     }
                 }
@@ -498,6 +509,10 @@ fn battle(gba: &mut agb::Gba) {
     let vblank = VBlank::get();
     let mut input = ButtonController::new();
 
+    let mut mixer = gba.mixer.mixer(Frequency::Hz32768);
+    let _irq = mixer.setup_interrupt_handler();
+    mixer.enable();
+
     let game_state = State::new(
         alloc::vec![
             HeldCard::Avaliable(CardType::Double),
@@ -527,10 +542,11 @@ fn battle(gba: &mut agb::Gba) {
     state.update_representation(update, &object);
 
     loop {
+        mixer.frame();
         vblank.wait_for_vblank();
         object.commit();
         input.update();
 
-        state.frame(&object, &input);
+        state.frame(&object, &input, &mut mixer);
     }
 }
