@@ -158,7 +158,7 @@ impl<'controller> MyState<'controller> {
 
     fn update_select_box(
         &mut self,
-        camera_position: Vector2D<Num<i32, 8>>,
+        position_difference: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
         controller: &'controller ObjectController,
     ) {
@@ -198,7 +198,7 @@ impl<'controller> MyState<'controller> {
                     self.select.state_stack.pop();
                 }
                 self.select.object.set_position(
-                    (position.change_base().hadamard(CONVERSION_FACTOR) + camera_position
+                    (position.change_base().hadamard(CONVERSION_FACTOR) + position_difference
                         - CONVERSION_FACTOR / 2)
                         .floor(),
                 );
@@ -243,7 +243,7 @@ impl<'controller> MyState<'controller> {
                             .into();
                             object.set_position(
                                 (position.change_base().hadamard(CONVERSION_FACTOR)
-                                    + camera_position)
+                                    + position_difference)
                                     .floor()
                                     - adjustment,
                             );
