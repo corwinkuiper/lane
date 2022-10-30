@@ -348,8 +348,6 @@ impl<'controller> MyState<'controller> {
         }
         state.camera_position = state.average_position();
 
-        state.update_hand_objects(object);
-
         state
     }
 
@@ -376,8 +374,10 @@ impl<'controller> MyState<'controller> {
             let bounding = Rect::new(pos, CONVERSION_FACTOR.floor());
             if bounding.touches(&screen_space) {
                 board_card.card_object.show();
+                board_card.colour_object.as_mut().map(|f| f.show());
             } else {
                 board_card.card_object.hide();
+                board_card.colour_object.as_mut().map(|f| f.hide());
             }
             if let Some(colour) = &mut board_card.colour_object {
                 colour.set_position(pos);
@@ -410,6 +410,8 @@ impl<'controller> MyState<'controller> {
         ai_mode: AIControl,
         object: &'controller ObjectController,
     ) -> Option<MoveResult> {
+        self.select.object.hide();
+
         let move_finder = self
             .move_finder
             .get_or_insert_with(|| ai_mode.move_finder(self.game_state.clone()));
@@ -421,7 +423,6 @@ impl<'controller> MyState<'controller> {
             self.update_representation(&result, object);
 
             self.move_finder = None;
-            self.update_hand_objects(object);
 
             Some(result)
         } else {
@@ -436,6 +437,9 @@ impl<'controller> MyState<'controller> {
         object: &'controller ObjectController,
         mixer: &mut Mixer,
     ) -> Option<MoveResult> {
+        if self.hand.is_empty() {
+            self.update_hand_objects(object);
+        }
         if let Some(desired_move) =
             self.update_select_box(position_difference, input, object, mixer)
         {
@@ -632,10 +636,17 @@ impl<'controller> MyState<'controller> {
             self.cards.insert(
                 idx.to_slotmap_key(),
                 CardOnBoard {
-                    card_object: object.object_sprite(card_type_to_sprite(new_card.card.to_type())),
-                    colour_object: new_card
-                        .belonging_player
-                        .map(|player| object.object_sprite(colour_for_player(player))),
+                    card_object: {
+                        let mut obj =
+                            object.object_sprite(card_type_to_sprite(new_card.card.to_type()));
+                        obj.hide();
+                        obj
+                    },
+                    colour_object: new_card.belonging_player.map(|player| {
+                        let mut obj = object.object_sprite(colour_for_player(player));
+                        obj.hide();
+                        obj
+                    }),
                     position: new_card
                         .position
                         .0
@@ -844,7 +855,7 @@ fn battle(gba: &mut agb::Gba) {
     let mut state = MyState::new(
         game_state,
         &object,
-        ControlMode::AI(AIControl::Best, Player::B),
+        ControlMode::TwoAI(AIControl::WithRandom(16), AIControl::WithRandom(16)),
     );
 
     loop {
