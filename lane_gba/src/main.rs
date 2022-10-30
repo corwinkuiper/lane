@@ -406,7 +406,7 @@ impl<'controller> MyState<'controller> {
                         .fast_normalise()
                         * ((*destination - current).manhattan_distance().min(4.into()))
                 }
-                CardAnimationStatus::Dying => todo!(),
+                CardAnimationStatus::Dying => { /* TODO: Death affect */ }
             }
         }
 
@@ -418,7 +418,7 @@ impl<'controller> MyState<'controller> {
                 CardAnimationStatus::Placed(pos) | CardAnimationStatus::MoveTowards(pos) => {
                     (cards[idx.to_slotmap_key()].position - *pos).manhattan_distance() < 1.into()
                 }
-                CardAnimationStatus::Dying => todo!(),
+                CardAnimationStatus::Dying => true, /* TODO: Death finaliser */
             })
             .collect::<Vec<_>>()
         {
@@ -427,7 +427,9 @@ impl<'controller> MyState<'controller> {
                     self.cards[idx.to_slotmap_key()].position = pos;
                     self.cards[idx.to_slotmap_key()].counts_to_average = true;
                 }
-                CardAnimationStatus::Dying => todo!(),
+                CardAnimationStatus::Dying => {
+                    self.cards.remove(idx.to_slotmap_key());
+                }
             }
         }
 
