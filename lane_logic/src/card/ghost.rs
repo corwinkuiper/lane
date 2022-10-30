@@ -22,7 +22,11 @@ impl Card for Ghost {
     }
 
     fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        PushStatus::Success(0)
+        match Normal::can_push(board, self_index, direction) {
+            PushStatus::Success(0) => PushStatus::Success(0),
+            PushStatus::Success(_) => PushStatus::Success(1),
+            PushStatus::Fail => PushStatus::Success(0),
+        }
     }
 
     fn can_place(
