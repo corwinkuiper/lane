@@ -32,7 +32,8 @@ const CARDS: &Graphics = include_aseprite!(
     "gfx/cards.aseprite",
     "gfx/arrow-right.aseprite",
     "gfx/arrow-down.aseprite",
-    "gfx/cards_double.aseprite"
+    "gfx/cards_double.aseprite",
+    "gfx/action.aseprite"
 );
 
 const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
@@ -42,6 +43,9 @@ const REFRESH: &Sprite = CARDS.tags().get("Refresh Double").sprite(0);
 
 const SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
 const SELECT_DOUBLE: &Sprite = CARDS.tags().get("Select Double").sprite(0);
+
+const PICK: &Tag = CARDS.tags().get("Pick");
+const PUSH: &Tag = CARDS.tags().get("Push");
 
 fn card_type_to_sprite(t: CardType) -> &'static Sprite {
     macro_rules! deconstify {
@@ -124,6 +128,51 @@ struct MyState<'controller> {
     hand: Vec<CardInHand<'controller>>,
     move_finder: Option<BestMoveFinder>,
     control_mode: ControlMode,
+    pick_help: PickHelp<'controller>,
+}
+
+struct PickHelp<'controller> {
+    pick: Object<'controller>,
+    push: Object<'controller>,
+}
+
+impl<'controller> PickHelp<'controller> {
+    fn new(object: &'controller ObjectController) -> Self {
+        let mut pick = object.object_sprite(PICK.sprite(0));
+        pick.set_position((WIDTH - 32, 0).into());
+        pick.set_z(-10);
+
+        let mut push = object.object_sprite(PUSH.sprite(0));
+        push.set_position((0, 0).into());
+        push.set_z(-10);
+
+        Self { pick, push }
+    }
+
+    fn hide(&mut self) {
+        self.pick.hide();
+        self.push.hide();
+    }
+
+    fn show(&mut self) {
+        self.pick.show();
+        self.push.show();
+    }
+
+    fn pick(&mut self, object: &'controller ObjectController) {
+        self.pick.set_sprite(object.sprite(PICK.sprite(1)));
+        self.push.set_sprite(object.sprite(PUSH.sprite(0)));
+    }
+
+    fn push(&mut self, object: &'controller ObjectController) {
+        self.pick.set_sprite(object.sprite(PICK.sprite(0)));
+        self.push.set_sprite(object.sprite(PUSH.sprite(1)));
+    }
+
+    fn reset(&mut self, object: &'controller ObjectController) {
+        self.pick.set_sprite(object.sprite(PICK.sprite(0)));
+        self.push.set_sprite(object.sprite(PUSH.sprite(0)));
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -326,6 +375,7 @@ impl<'controller> MyState<'controller> {
             game_state: initial_state,
             select: SelectBox {
                 object: object.object_sprite(SELECT),
+                pick_box: object.object_sprite(SELECT_DOUBLE),
                 state_stack: alloc::vec![SelectState::Hand { slot: 0 }],
             },
             select_arrow: None,
@@ -333,7 +383,10 @@ impl<'controller> MyState<'controller> {
             hand: Vec::new(),
             move_finder: None,
             control_mode: control,
+            pick_help: PickHelp::new(object),
         };
+
+        state.pick_help.hide();
 
         for (idx, card) in state.game_state.board_state() {
             state.cards.insert(
@@ -413,6 +466,8 @@ impl<'controller> MyState<'controller> {
         object: &'controller ObjectController,
     ) -> Option<MoveResult> {
         self.select.object.hide();
+        self.select.pick_box.hide();
+        self.pick_help.hide();
 
         let move_finder = self
             .move_finder
@@ -439,6 +494,8 @@ impl<'controller> MyState<'controller> {
         object: &'controller ObjectController,
         mixer: &mut Mixer,
     ) -> Option<MoveResult> {
+        self.pick_help.show();
+
         if self.hand.is_empty() {
             self.update_hand_objects(object);
         }
@@ -457,6 +514,7 @@ impl<'controller> MyState<'controller> {
                 self.select.state_stack.clear();
                 self.select.state_stack.push(SelectState::Hand { slot: 0 });
                 self.hand.clear();
+                self.select.pick_box.hide();
 
                 self.select.object.hide();
 
@@ -482,6 +540,8 @@ impl<'controller> MyState<'controller> {
         match self.select.state_mut() {
             SelectState::Hand { slot } => {
                 let num_cards = self.game_state.turn_hand().len();
+
+                self.pick_help.reset(controller);
 
                 if num_cards != 0 {
                     *slot = (*slot as i32 + input_vector.x).rem_euclid(num_cards as i32) as usize;
@@ -525,6 +585,7 @@ impl<'controller> MyState<'controller> {
                             reason: BoardSelect::Pick,
                         });
                 }
+                self.select.pick_box.hide();
             }
             SelectState::BoardSelectPosition { position, reason } => {
                 *position += input_vector;
@@ -532,6 +593,17 @@ impl<'controller> MyState<'controller> {
                 let reason = *reason;
                 self.select.object.show();
                 self.select.object.set_sprite(controller.sprite(SELECT));
+
+                match reason {
+                    BoardSelect::Push => self.pick_help.push(controller),
+                    BoardSelect::Pick => self.pick_help.pick(controller),
+                    BoardSelect::Place(idx) => {
+                        self.select
+                            .pick_box
+                            .set_position(self.hand[idx].cached_position);
+                        self.select.pick_box.show();
+                    }
+                }
 
                 if input.is_just_pressed(Button::A) {
                     if reason == BoardSelect::Pick {
@@ -793,6 +865,7 @@ enum CardAnimationStatus {
 
 struct SelectBox<'controller> {
     object: Object<'controller>,
+    pick_box: Object<'controller>,
     state_stack: Vec<SelectState>,
 }
 
