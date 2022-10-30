@@ -1,10 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "../lane_logic"
+			"path": "../lane_gba"
 		},
 		{
-			"path": "../lane_gba"
+			"path": "../lane_logic"
 		}
 	],
 	"settings": {}
