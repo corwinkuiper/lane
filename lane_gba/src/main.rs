@@ -19,8 +19,8 @@ use agb::{
 use alloc::{boxed::Box, vec::Vec};
 use lane_logic::{
     card::{score, CardType},
-    Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PlaceCardMove, Player, Position,
-    PushCardMove, State,
+    Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove, PlaceCardMove,
+    Player, Position, PushCardMove, State,
 };
 use slotmap::{DefaultKey, SecondaryMap};
 
@@ -517,6 +517,13 @@ impl<'controller> MyState<'controller> {
                             position: (0, 0).into(),
                             reason: BoardSelect::Push,
                         });
+                } else if input.is_just_pressed(Button::R) {
+                    self.select
+                        .state_stack
+                        .push(SelectState::BoardSelectPosition {
+                            position: (0, 0).into(),
+                            reason: BoardSelect::Pick,
+                        });
                 }
             }
             SelectState::BoardSelectPosition { position, reason } => {
@@ -527,9 +534,17 @@ impl<'controller> MyState<'controller> {
                 self.select.object.set_sprite(controller.sprite(SELECT));
 
                 if input.is_just_pressed(Button::A) {
-                    self.select
-                        .state_stack
-                        .push(SelectState::BoardSelectDirection { position, reason });
+                    if reason == BoardSelect::Pick {
+                        if let Some(card) = self.game_state.card_at_position(Position(position)) {
+                            return Some(Move::PickCard(PickCardMove { card: card.0 }));
+                        } else {
+                            mixer.play_sound(SoundChannel::new(INCORRECT));
+                        }
+                    } else {
+                        self.select
+                            .state_stack
+                            .push(SelectState::BoardSelectDirection { position, reason });
+                    }
                 } else if input.is_just_pressed(Button::B) {
                     self.select.state_stack.pop();
                 }
@@ -594,7 +609,7 @@ impl<'controller> MyState<'controller> {
                 } else {
                     self.select_arrow = None;
                 }
-                if input.is_just_released(Button::A) {
+                if input.is_just_released(Button::A) && reason != BoardSelect::Pick {
                     self.select.state_stack.pop();
 
                     if let Some(direction) = direction {
@@ -613,6 +628,7 @@ impl<'controller> MyState<'controller> {
                                 coordinate: Position(position),
                                 card: HeldCardIndex(index),
                             })),
+                            BoardSelect::Pick => None,
                         })();
 
                         if let Some(desired_move) = desired_move {
@@ -794,10 +810,11 @@ impl SelectBox<'_> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BoardSelect {
     Push,
     Place(usize),
+    Pick,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -857,7 +874,7 @@ fn battle(gba: &mut agb::Gba) {
     let mut state = MyState::new(
         game_state,
         &object,
-        ControlMode::TwoAI(AIControl::WithRandom(16), AIControl::WithRandom(16)),
+        ControlMode::AI(AIControl::WithRandom(16), Player::B),
     );
 
     loop {
