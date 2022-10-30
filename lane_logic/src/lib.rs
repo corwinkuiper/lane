@@ -219,7 +219,13 @@ impl State {
             }
         }
 
-        let winner = None;
+        let score = self.scores();
+
+        let winner = match (score.player(Player::A) >= 3, score.player(Player::B) >= 3) {
+            (true, false) => Some(Player::A),
+            (false, true) => Some(Player::B),
+            (_, _) => None,
+        };
 
         self.turn = match self.turn {
             Player::A => Player::B,
@@ -231,7 +237,7 @@ impl State {
             moved,
             removed,
             winner,
-            score: self.scores(),
+            score,
         }
     }
 
