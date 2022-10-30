@@ -7,7 +7,7 @@
 
 use agb::{
     display::{
-        object::{self, Graphics, Object, ObjectController, Sprite, Tag},
+        object::{Graphics, Object, ObjectController, Sprite, Tag},
         HEIGHT, WIDTH,
     },
     fixnum::{Num, Rect, Vector2D},
@@ -30,13 +30,17 @@ extern crate alloc;
 const CARDS: &Graphics = include_aseprite!(
     "gfx/cards.aseprite",
     "gfx/arrow-right.aseprite",
-    "gfx/arrow-down.aseprite"
+    "gfx/arrow-down.aseprite",
+    "gfx/cards_double.aseprite"
 );
 
 const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
 const ARROW_DOWN: &Sprite = CARDS.tags().get("Arrow Down").sprite(0);
 
+const REFRESH: &Sprite = CARDS.tags().get("Refresh Double").sprite(0);
+
 const SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
+const SELECT_DOUBLE: &Sprite = CARDS.tags().get("Select Double").sprite(0);
 
 fn card_type_to_sprite(t: CardType) -> &'static Sprite {
     macro_rules! deconstify {
@@ -54,6 +58,22 @@ fn card_type_to_sprite(t: CardType) -> &'static Sprite {
     }
 }
 
+fn card_type_to_sprite_double(t: CardType) -> &'static Sprite {
+    macro_rules! deconstify {
+        ($t: expr) => {{
+            const A: &'static Tag = $t;
+            A
+        }};
+    }
+    match t {
+        CardType::Block => deconstify!(CARDS.tags().get("Block Double")).sprite(0),
+        CardType::Normal => deconstify!(CARDS.tags().get("Normal Double")).sprite(0),
+        CardType::Double => deconstify!(CARDS.tags().get("Double Double")).sprite(0),
+        CardType::Ghost => deconstify!(CARDS.tags().get("Ghost Double")).sprite(0),
+        CardType::Score => deconstify!(CARDS.tags().get("Score Double")).sprite(0),
+    }
+}
+
 fn colour_for_player(t: Player) -> &'static Sprite {
     macro_rules! deconstify {
         ($t: expr) => {{
@@ -67,11 +87,30 @@ fn colour_for_player(t: Player) -> &'static Sprite {
     }
 }
 
+fn colour_for_player_double(t: Player) -> &'static Sprite {
+    macro_rules! deconstify {
+        ($t: expr) => {{
+            const A: &'static Tag = $t;
+            A
+        }};
+    }
+    match t {
+        Player::A => deconstify!(CARDS.tags().get("Green Double")).sprite(0),
+        Player::B => deconstify!(CARDS.tags().get("Blue Double")).sprite(0),
+    }
+}
+
 #[agb::entry]
 fn main(mut gba: agb::Gba) -> ! {
     battle(&mut gba);
 
     panic!("not supposed to get here!");
+}
+
+struct CardInHand<'controller> {
+    card_object: Object<'controller>,
+    colour_object: Object<'controller>,
+    cached_position: Vector2D<i32>,
 }
 
 struct MyState<'controller> {
@@ -81,6 +120,7 @@ struct MyState<'controller> {
     select: SelectBox<'controller>,
     camera_position: Vector2D<Num<i32, 8>>,
     select_arrow: Option<Object<'controller>>,
+    hand: Vec<CardInHand<'controller>>,
 }
 
 impl<'controller> MyState<'controller> {
@@ -97,6 +137,51 @@ impl<'controller> MyState<'controller> {
         average_position
     }
 
+    fn update_hand_objects(&mut self, object: &'controller ObjectController) {
+        self.hand.clear();
+        let player = self.game_state.turn();
+        let held_cards = self.game_state.turn_hand();
+
+        let number_of_held_cards = held_cards.len();
+
+        let first_x = (WIDTH / 2) - number_of_held_cards as i32 * 34 / 2;
+
+        for (count, card_in_hand) in held_cards.iter().enumerate() {
+            let count = count as i32;
+            let position = (first_x + 34 * count, HEIGHT - 34).into();
+
+            match card_in_hand {
+                HeldCard::Avaliable(card) => {
+                    let mut held = CardInHand {
+                        card_object: object.object_sprite(card_type_to_sprite_double(*card)),
+                        colour_object: object.object_sprite(colour_for_player_double(player)),
+                        cached_position: position,
+                    };
+
+                    held.card_object.set_position(position);
+                    held.colour_object.set_position(position);
+                    held.colour_object.set_z(1);
+                    self.hand.push(held);
+                }
+                HeldCard::Waiting {
+                    card,
+                    turns_until_usable: _,
+                } => {
+                    let mut held = CardInHand {
+                        card_object: object.object_sprite(card_type_to_sprite_double(*card)),
+                        colour_object: object.object_sprite(REFRESH),
+                        cached_position: position,
+                    };
+
+                    held.card_object.set_position(position);
+                    held.colour_object.set_position(position);
+                    held.colour_object.set_z(1);
+                    self.hand.push(held);
+                }
+            }
+        }
+    }
+
     fn new(initial_state: State, object: &'controller ObjectController) -> Self {
         let mut state = MyState {
             cards: Default::default(),
@@ -108,6 +193,7 @@ impl<'controller> MyState<'controller> {
             },
             select_arrow: None,
             camera_position: Default::default(),
+            hand: Vec::new(),
         };
 
         for (idx, card) in state.game_state.board_state() {
@@ -124,6 +210,8 @@ impl<'controller> MyState<'controller> {
             );
         }
         state.camera_position = state.average_position();
+
+        state.update_hand_objects(object);
 
         state
     }
@@ -160,19 +248,24 @@ impl<'controller> MyState<'controller> {
             }
         }
 
-        // process the select box
-        if let Some(desired_move) =
-            self.update_select_box(position_difference, input, object, mixer)
-        {
-            // validate the move is possible
-            if self.game_state.can_execute_move(&desired_move) {
-                // woah!
-                let result = self.game_state.execute_move(&desired_move);
-                self.update_representation(result, object);
-                self.select.state_stack.clear();
-                self.select.state_stack.push(SelectState::Hand { slot: 0 });
-            } else {
-                mixer.play_sound(SoundChannel::new(INCORRECT));
+        if self.playing_animations.is_empty() {
+            // process the select box
+            if let Some(desired_move) =
+                self.update_select_box(position_difference, input, object, mixer)
+            {
+                // validate the move is possible
+                if self.game_state.can_execute_move(&desired_move) {
+                    // woah!
+                    let result = self.game_state.execute_move(&desired_move);
+                    self.update_representation(result, object);
+                    self.select.state_stack.clear();
+                    self.select.state_stack.push(SelectState::Hand { slot: 0 });
+                    self.update_hand_objects(object);
+
+                    self.select.object.hide();
+                } else {
+                    mixer.play_sound(SoundChannel::new(INCORRECT));
+                }
             }
         }
     }
@@ -188,10 +281,34 @@ impl<'controller> MyState<'controller> {
 
         match self.select.state_mut() {
             SelectState::Hand { slot } => {
-                *slot = (*slot as i32 + input_vector.x)
-                    .rem_euclid(self.game_state.player_hand(self.game_state.turn()).len() as i32)
-                    as usize;
+                let num_cards = self.game_state.turn_hand().len();
 
+                if num_cards != 0 {
+                    *slot = (*slot as i32 + input_vector.x).rem_euclid(num_cards as i32) as usize;
+
+                    let slot = *slot;
+
+                    if input.is_just_pressed(Button::A) {
+                        let slot = slot;
+                        agb::println!("Pressed A on card {}", slot);
+                        self.select
+                            .state_stack
+                            .push(SelectState::BoardSelectPosition {
+                                position: (0, 0).into(),
+                                reason: BoardSelect::Place(slot),
+                            });
+                    }
+                    self.select
+                        .object
+                        .set_sprite(controller.sprite(SELECT_DOUBLE));
+                    self.select
+                        .object
+                        .set_position(self.hand[slot].cached_position);
+
+                    self.select.object.show();
+                } else {
+                    self.select.object.hide();
+                }
                 if input.is_just_pressed(Button::L) {
                     agb::println!("Pressed L");
                     self.select
@@ -200,21 +317,14 @@ impl<'controller> MyState<'controller> {
                             position: (0, 0).into(),
                             reason: BoardSelect::Push,
                         });
-                } else if input.is_just_pressed(Button::A) {
-                    let slot = *slot;
-                    agb::println!("Pressed A on card {}", slot);
-                    self.select
-                        .state_stack
-                        .push(SelectState::BoardSelectPosition {
-                            position: (0, 0).into(),
-                            reason: BoardSelect::Place(slot),
-                        });
                 }
             }
             SelectState::BoardSelectPosition { position, reason } => {
                 *position += input_vector;
                 let position = *position;
                 let reason = *reason;
+                self.select.object.show();
+                self.select.object.set_sprite(controller.sprite(SELECT));
 
                 if input.is_just_pressed(Button::A) {
                     self.select
@@ -532,16 +642,6 @@ fn battle(gba: &mut agb::Gba) {
     );
 
     let mut state = MyState::new(game_state, &object);
-
-    let update = state
-        .game_state
-        .execute_move(&Move::PlaceCard(PlaceCardMove {
-            direction: Direction::East,
-            coordinate: Position((-1, 0).into()),
-            card: HeldCardIndex(0),
-        }));
-
-    state.update_representation(update, &object);
 
     loop {
         mixer.frame();

@@ -188,12 +188,36 @@ impl State {
             ),
         };
 
+        for card_in_hand in self.hands.iter_mut().map(|x| x.cards.iter_mut()).flatten() {
+            match card_in_hand {
+                HeldCard::Avaliable(_) => {}
+                HeldCard::Waiting {
+                    card,
+                    turns_until_usable,
+                } => {
+                    *turns_until_usable -= 1;
+                    if *turns_until_usable == 0 {
+                        *card_in_hand = HeldCard::Avaliable(*card);
+                    }
+                }
+            }
+        }
+
         let moved = moved
             .iter()
             .map(|&idx| (idx, self.board[idx].clone()))
             .collect();
 
         let removed = self.board.remove_cards();
+
+        for (_, card) in removed.iter() {
+            if let Some(player) = card.belonging_player {
+                self.hands[player as usize].cards.push(HeldCard::Waiting {
+                    card: card.card.to_type(),
+                    turns_until_usable: 1,
+                });
+            }
+        }
 
         let winner = None;
 
@@ -234,6 +258,10 @@ impl State {
 
     pub fn card(&self, idx: Index) -> Option<&PlacedCard> {
         self.board.get_card(idx)
+    }
+
+    pub fn turn_hand(&self) -> &[HeldCard] {
+        self.player_hand(self.turn())
     }
 }
 
