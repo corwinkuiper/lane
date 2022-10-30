@@ -158,11 +158,15 @@ impl State {
                         PushStatus::Fail => false,
                     }
             }
+            Move::PickCard(pick) => self
+                .board
+                .get_card(pick.card)
+                .map_or(false, |c| c.belonging_player == Some(self.turn)),
         }
     }
 
     pub fn execute_move(&mut self, m: &Move) -> MoveResult {
-        let (placed, moved) = match m {
+        let (placed, moved, mut picked) = match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
                 HeldCard::Avaliable(card) => {
                     self.hands[self.turn as usize].cards.remove(place.card.0);
@@ -182,6 +186,7 @@ impl State {
                             }
                         )],
                         moved_cards,
+                        Vec::new(),
                     )
                 }
                 HeldCard::Waiting {
@@ -192,7 +197,16 @@ impl State {
             Move::PushCard(push) => (
                 Vec::new(),
                 self.board.start_push(push.place, push.direction),
+                Vec::new(),
             ),
+            Move::PickCard(pick) => {
+                let card = self.board.positions.remove(pick.card.0);
+                (
+                    Vec::new(),
+                    Set::new(),
+                    alloc::vec![(pick.card, card.unwrap())],
+                )
+            }
         };
 
         for card_in_hand in self.hands.iter_mut().map(|x| x.cards.iter_mut()).flatten() {
@@ -215,7 +229,8 @@ impl State {
             .map(|&idx| (idx, self.board[idx].clone()))
             .collect();
 
-        let removed = self.board.remove_cards();
+        let mut removed = self.board.remove_cards();
+        removed.append(&mut picked);
 
         for (_, card) in removed.iter() {
             if let Some(player) = card.belonging_player {
@@ -317,6 +332,8 @@ impl State {
             if card.belonging_player != Some(self.turn()) {
                 continue;
             }
+
+            moves.push(Move::PickCard(PickCardMove { card: Index(idx) }));
 
             for direction in DIRECTIONS {
                 let m = Move::PushCard(PushCardMove {
@@ -551,9 +568,14 @@ pub struct PushCardMove {
     pub direction: Direction,
 }
 
+pub struct PickCardMove {
+    pub card: Index,
+}
+
 pub enum Move {
     PlaceCard(PlaceCardMove),
     PushCard(PushCardMove),
+    PickCard(PickCardMove),
 }
 
 #[derive(Debug)]
