@@ -16,7 +16,7 @@ use agb::{
     interrupt::VBlank,
     sound::mixer::{Frequency, Mixer, SoundChannel},
 };
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use lane_logic::{
     card::{score, CardType},
     Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PlaceCardMove, Player, Position,
@@ -122,6 +122,39 @@ struct MyState<'controller> {
     camera_position: Vector2D<Num<i32, 8>>,
     select_arrow: Option<Object<'controller>>,
     hand: Vec<CardInHand<'controller>>,
+    move_finder: Option<BestMoveFinder>,
+    control_mode: ControlMode,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AIControl {
+    Best,
+    WithRandom(i32),
+    Negative,
+}
+
+impl AIControl {
+    fn move_finder(&self, state: State) -> BestMoveFinder {
+        match *self {
+            AIControl::Best => BestMoveFinder::new(state, Box::new(calculate_state_score)),
+            AIControl::WithRandom(v) => BestMoveFinder::new(
+                state,
+                Box::new(move |result, player| {
+                    calculate_state_score(result, player) + agb::rng::gen() % v - v / 2
+                }),
+            ),
+            AIControl::Negative => BestMoveFinder::new(
+                state,
+                Box::new(|result, player| -calculate_state_score(result, player)),
+            ),
+        }
+    }
+}
+
+enum ControlMode {
+    TwoHuman,
+    AI(AIControl, Player),
+    TwoAI(AIControl, AIControl),
 }
 
 fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
@@ -149,6 +182,7 @@ fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
 struct BestMoveFinder {
     game_state: State,
     find_state: FindState,
+    score_function: Box<dyn Fn(&MoveResult, Player) -> i32>,
 }
 
 enum FindState {
@@ -162,7 +196,7 @@ enum FindState {
 }
 
 impl BestMoveFinder {
-    fn new(game_state: State) -> Self {
+    fn new(game_state: State, score_function: Box<dyn Fn(&MoveResult, Player) -> i32>) -> Self {
         let possible = game_state.enumerate_possible_moves();
         BestMoveFinder {
             find_state: FindState::CalculateScores {
@@ -170,6 +204,7 @@ impl BestMoveFinder {
                 possible_moves: possible,
             },
             game_state,
+            score_function,
         }
     }
 
@@ -185,7 +220,7 @@ impl BestMoveFinder {
                     let m = possible_moves.pop();
                     if let Some(m) = m {
                         let result = self.game_state.clone().execute_move(&m);
-                        let score = calculate_state_score(&result, player);
+                        let score = (self.score_function)(&result, player);
                         scored_moves.push((m, score))
                     } else {
                         break;
@@ -220,33 +255,6 @@ impl BestMoveFinder {
 }
 
 impl<'controller> MyState<'controller> {
-    /// This attempts to find a good move for the current player, for now this blocks but in future it should be implemented as something non blocking and resumable
-    fn find_good_move(&self) -> Option<Move> {
-        let moves = self.game_state.enumerate_possible_moves();
-
-        let current_turn = self.game_state.turn();
-
-        let mut scored_moves: Vec<_> = moves
-            .into_iter()
-            .map(|m| {
-                (
-                    calculate_state_score(&self.game_state.clone().execute_move(&m), current_turn),
-                    m,
-                )
-            })
-            .collect();
-
-        let max_score = scored_moves.iter().max_by_key(|x| x.0)?.0;
-
-        scored_moves.retain(|(s, _)| *s == max_score);
-
-        let ran = agb::rng::gen() as usize;
-
-        let (_, desired_move) = scored_moves.swap_remove(ran % scored_moves.len());
-
-        Some(desired_move)
-    }
-
     #[track_caller]
     fn average_position(&self) -> Vector2D<Num<i32, 8>> {
         let average_position: Vector2D<Num<i32, 8>> = self
@@ -305,7 +313,11 @@ impl<'controller> MyState<'controller> {
         }
     }
 
-    fn new(initial_state: State, object: &'controller ObjectController) -> Self {
+    fn new(
+        initial_state: State,
+        object: &'controller ObjectController,
+        control: ControlMode,
+    ) -> Self {
         let mut state = MyState {
             cards: Default::default(),
             playing_animations: Default::default(),
@@ -317,6 +329,8 @@ impl<'controller> MyState<'controller> {
             select_arrow: None,
             camera_position: Default::default(),
             hand: Vec::new(),
+            move_finder: None,
+            control_mode: control,
         };
 
         for (idx, card) in state.game_state.board_state() {
@@ -372,36 +386,81 @@ impl<'controller> MyState<'controller> {
         }
 
         if self.playing_animations.is_empty() {
-            // process the select box
-            if let Some(desired_move) =
-                self.update_select_box(position_difference, input, object, mixer)
-            {
-                // validate the move is possible
-                if self.game_state.can_execute_move(&desired_move) {
-                    // woah!
-                    let result = self.game_state.execute_move(&desired_move);
-
-                    agb::println!("The winner is... {:?}", result.winner);
-
-                    self.update_representation(result, object);
-
-                    if self.game_state.turn() == Player::B {
-                        let m = self.find_good_move().unwrap();
-                        let result = self.game_state.execute_move(&m);
-                        agb::println!("The winner is... {:?}", result.winner);
-
-                        self.update_representation(result, object);
-                    }
-
-                    self.select.state_stack.clear();
-                    self.select.state_stack.push(SelectState::Hand { slot: 0 });
-                    self.update_hand_objects(object);
-
-                    self.select.object.hide();
-                } else {
-                    mixer.play_sound(SoundChannel::new(INCORRECT));
+            let _result = match self.control_mode {
+                ControlMode::TwoHuman => {
+                    self.do_human_turn(position_difference, input, object, mixer)
                 }
+                ControlMode::AI(ai, player) => {
+                    if player == self.game_state.turn() {
+                        self.do_ai_turn(ai, object)
+                    } else {
+                        self.do_human_turn(position_difference, input, object, mixer)
+                    }
+                }
+                ControlMode::TwoAI(ai1, ai2) => match self.game_state.turn() {
+                    Player::A => self.do_ai_turn(ai1, object),
+                    Player::B => self.do_ai_turn(ai2, object),
+                },
+            };
+        }
+    }
+
+    fn do_ai_turn(
+        &mut self,
+        ai_mode: AIControl,
+        object: &'controller ObjectController,
+    ) -> Option<MoveResult> {
+        let move_finder = self
+            .move_finder
+            .get_or_insert_with(|| ai_mode.move_finder(self.game_state.clone()));
+
+        if let Some(m) = move_finder.do_work(10) {
+            let result = self.game_state.execute_move(&m);
+            agb::println!("The winner is... {:?}", result.winner);
+
+            self.update_representation(&result, object);
+
+            self.move_finder = None;
+            self.update_hand_objects(object);
+
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    fn do_human_turn(
+        &mut self,
+        position_difference: Vector2D<Num<i32, 8>>,
+        input: &ButtonController,
+        object: &'controller ObjectController,
+        mixer: &mut Mixer,
+    ) -> Option<MoveResult> {
+        if let Some(desired_move) =
+            self.update_select_box(position_difference, input, object, mixer)
+        {
+            // validate the move is possible
+            if self.game_state.can_execute_move(&desired_move) {
+                // woah!
+                let result = self.game_state.execute_move(&desired_move);
+
+                agb::println!("The winner is... {:?}", result.winner);
+
+                self.update_representation(&result, object);
+
+                self.select.state_stack.clear();
+                self.select.state_stack.push(SelectState::Hand { slot: 0 });
+                self.hand.clear();
+
+                self.select.object.hide();
+
+                Some(result)
+            } else {
+                mixer.play_sound(SoundChannel::new(INCORRECT));
+                None
             }
+        } else {
+            None
         }
     }
 
@@ -563,7 +622,11 @@ impl<'controller> MyState<'controller> {
         None
     }
 
-    fn update_representation(&mut self, update: MoveResult, object: &'controller ObjectController) {
+    fn update_representation(
+        &mut self,
+        update: &MoveResult,
+        object: &'controller ObjectController,
+    ) {
         // add the newly placed cards
         for (idx, direction, new_card) in &update.placed {
             self.cards.insert(
@@ -778,7 +841,11 @@ fn battle(gba: &mut agb::Gba) {
         Player::A,
     );
 
-    let mut state = MyState::new(game_state, &object);
+    let mut state = MyState::new(
+        game_state,
+        &object,
+        ControlMode::AI(AIControl::Best, Player::B),
+    );
 
     loop {
         mixer.frame();
