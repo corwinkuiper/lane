@@ -231,6 +231,7 @@ impl State {
             moved,
             removed,
             winner,
+            score: self.scores(),
         }
     }
 
@@ -262,6 +263,12 @@ impl State {
 
     pub fn turn_hand(&self) -> &[HeldCard] {
         self.player_hand(self.turn())
+    }
+
+    pub fn scores(&self) -> Score {
+        Score {
+            scores: self.board.score(),
+        }
     }
 }
 
@@ -295,6 +302,40 @@ impl Board {
         });
 
         Self { positions: pos }
+    }
+
+    fn score(&self) -> [usize; 2] {
+        let mut scores = [0, 0];
+
+        let mut score_cards = Vec::new();
+
+        for (_idx, card) in self.positions.iter() {
+            if card.card.to_type() == CardType::Score {
+                score_cards.push(card.position);
+            }
+        }
+
+        let directions = [
+            Direction::North,
+            Direction::East,
+            Direction::South,
+            Direction::West,
+        ];
+
+        let scoring_cards = score_cards
+            .iter()
+            .map(|&x| directions.iter().map(move |&y| x + y))
+            .flatten()
+            .flat_map(|x| self.get_card_position(x))
+            .collect::<Set<_>>();
+
+        for idx in scoring_cards {
+            if let Some(player) = self.get_card(idx).unwrap().belonging_player {
+                scores[player as usize] += 1;
+            }
+        }
+
+        scores
     }
 
     fn start_push(&mut self, idx: Index, direction: Direction) -> Set<Index> {
@@ -459,6 +500,17 @@ pub struct MoveResult {
     pub moved: Vec<(Index, PlacedCard)>,
     pub removed: Vec<(Index, PlacedCard)>,
     pub winner: Option<Player>,
+    pub score: Score,
+}
+
+pub struct Score {
+    scores: [usize; 2],
+}
+
+impl Score {
+    pub fn player(&self, player: Player) -> usize {
+        self.scores[player as usize]
+    }
 }
 
 type Set<I> = alloc::collections::BTreeSet<I>;
