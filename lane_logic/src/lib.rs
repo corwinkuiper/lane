@@ -34,6 +34,13 @@ pub enum Direction {
     West,
 }
 
+const DIRECTIONS: [Direction; 4] = [
+    Direction::North,
+    Direction::East,
+    Direction::South,
+    Direction::West,
+];
+
 impl Direction {
     pub fn to_unit_vector(self) -> Vector2D<i32> {
         match self {
@@ -221,7 +228,7 @@ impl State {
 
         let score = self.scores();
 
-        let winner = match (score.player(Player::A) >= 3, score.player(Player::B) >= 3) {
+        let winner = match (score.player(Player::A) >= 4, score.player(Player::B) >= 4) {
             (true, false) => Some(Player::A),
             (false, true) => Some(Player::B),
             (_, _) => None,
@@ -275,6 +282,54 @@ impl State {
         Score {
             scores: self.board.score(),
         }
+    }
+
+    pub fn enumerate_possible_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+
+        // create list of positions that is valid to place
+        let mut possible = Vec::new();
+
+        for (_idx, card) in self.board.positions.iter() {
+            for direction in DIRECTIONS {
+                let desired_spot = card.position + direction;
+                if self.board.no_cards_in_direction(card.position, direction) {
+                    possible.push((desired_spot, -direction));
+                }
+            }
+        }
+
+        // go over the hand of the current player
+        for (idx, card) in self.turn_hand().iter().enumerate() {
+            if let HeldCard::Avaliable(_card) = card {
+                for (position, direction) in possible.iter().copied() {
+                    moves.push(Move::PlaceCard(PlaceCardMove {
+                        direction: direction,
+                        coordinate: position,
+                        card: HeldCardIndex(idx),
+                    }))
+                }
+            }
+        }
+
+        // all possible pushing moves
+        for (idx, card) in self.board.positions.iter() {
+            if card.belonging_player != Some(self.turn()) {
+                continue;
+            }
+
+            for direction in DIRECTIONS {
+                let m = Move::PushCard(PushCardMove {
+                    place: Index(idx),
+                    direction,
+                });
+                if self.can_execute_move(&m) {
+                    moves.push(m);
+                }
+            }
+        }
+
+        moves
     }
 }
 
@@ -501,6 +556,7 @@ pub enum Move {
     PushCard(PushCardMove),
 }
 
+#[derive(Debug)]
 pub struct MoveResult {
     pub placed: Vec<(Index, Direction, PlacedCard)>,
     pub moved: Vec<(Index, PlacedCard)>,
@@ -509,6 +565,7 @@ pub struct MoveResult {
     pub score: Score,
 }
 
+#[derive(Debug)]
 pub struct Score {
     scores: [usize; 2],
 }

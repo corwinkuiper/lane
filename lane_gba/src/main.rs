@@ -18,8 +18,9 @@ use agb::{
 };
 use alloc::vec::Vec;
 use lane_logic::{
-    card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PlaceCardMove,
-    Player, Position, PushCardMove, State,
+    card::{score, CardType},
+    Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PlaceCardMove, Player, Position,
+    PushCardMove, State,
 };
 use slotmap::{DefaultKey, SecondaryMap};
 
@@ -123,7 +124,129 @@ struct MyState<'controller> {
     hand: Vec<CardInHand<'controller>>,
 }
 
+fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
+    let mut score: i32 = 0;
+
+    let alternate_turn = match current_turn {
+        Player::A => Player::B,
+        Player::B => Player::A,
+    };
+
+    if result.winner == Some(current_turn) {
+        score += 100000000;
+    }
+
+    if result.winner == Some(alternate_turn) {
+        score -= 100000000;
+    }
+
+    score += result.score.player(current_turn) as i32;
+    score -= result.score.player(alternate_turn) as i32 * 4;
+
+    score
+}
+
+struct BestMoveFinder {
+    game_state: State,
+    find_state: FindState,
+}
+
+enum FindState {
+    CalculateScores {
+        possible_moves: Vec<Move>,
+        scored_moves: Vec<(Move, i32)>,
+    },
+    FindBest {
+        scored_moves: Vec<(Move, i32)>,
+    },
+}
+
+impl BestMoveFinder {
+    fn new(game_state: State) -> Self {
+        let possible = game_state.enumerate_possible_moves();
+        BestMoveFinder {
+            find_state: FindState::CalculateScores {
+                scored_moves: Vec::with_capacity(possible.len()),
+                possible_moves: possible,
+            },
+            game_state,
+        }
+    }
+
+    fn do_work(&mut self, steps: usize) -> Option<Move> {
+        match &mut self.find_state {
+            FindState::CalculateScores {
+                possible_moves,
+                scored_moves,
+            } => {
+                let player = self.game_state.turn();
+
+                for _ in 0..steps {
+                    let m = possible_moves.pop();
+                    if let Some(m) = m {
+                        let result = self.game_state.clone().execute_move(&m);
+                        let score = calculate_state_score(&result, player);
+                        scored_moves.push((m, score))
+                    } else {
+                        break;
+                    }
+                }
+
+                if possible_moves.is_empty() {
+                    let mut new_score = Vec::new();
+                    core::mem::swap(scored_moves, &mut new_score);
+
+                    self.find_state = FindState::FindBest {
+                        scored_moves: new_score,
+                    }
+                }
+
+                None
+            }
+
+            FindState::FindBest { scored_moves } => {
+                let max_score = scored_moves.iter().max_by_key(|x| x.1)?.1;
+
+                scored_moves.retain(|(_, s)| *s == max_score);
+
+                let ran = agb::rng::gen() as usize;
+
+                let (desired_move, _) = scored_moves.swap_remove(ran % scored_moves.len());
+
+                Some(desired_move)
+            }
+        }
+    }
+}
+
 impl<'controller> MyState<'controller> {
+    /// This attempts to find a good move for the current player, for now this blocks but in future it should be implemented as something non blocking and resumable
+    fn find_good_move(&self) -> Option<Move> {
+        let moves = self.game_state.enumerate_possible_moves();
+
+        let current_turn = self.game_state.turn();
+
+        let mut scored_moves: Vec<_> = moves
+            .into_iter()
+            .map(|m| {
+                (
+                    calculate_state_score(&self.game_state.clone().execute_move(&m), current_turn),
+                    m,
+                )
+            })
+            .collect();
+
+        let max_score = scored_moves.iter().max_by_key(|x| x.0)?.0;
+
+        scored_moves.retain(|(s, _)| *s == max_score);
+
+        let ran = agb::rng::gen() as usize;
+
+        let (_, desired_move) = scored_moves.swap_remove(ran % scored_moves.len());
+
+        Some(desired_move)
+    }
+
     #[track_caller]
     fn average_position(&self) -> Vector2D<Num<i32, 8>> {
         let average_position: Vector2D<Num<i32, 8>> = self
@@ -257,7 +380,19 @@ impl<'controller> MyState<'controller> {
                 if self.game_state.can_execute_move(&desired_move) {
                     // woah!
                     let result = self.game_state.execute_move(&desired_move);
+
+                    agb::println!("The winner is... {:?}", result.winner);
+
                     self.update_representation(result, object);
+
+                    if self.game_state.turn() == Player::B {
+                        let m = self.find_good_move().unwrap();
+                        let result = self.game_state.execute_move(&m);
+                        agb::println!("The winner is... {:?}", result.winner);
+
+                        self.update_representation(result, object);
+                    }
+
                     self.select.state_stack.clear();
                     self.select.state_stack.push(SelectState::Hand { slot: 0 });
                     self.update_hand_objects(object);
@@ -650,6 +785,7 @@ fn battle(gba: &mut agb::Gba) {
         vblank.wait_for_vblank();
         object.commit();
         input.update();
+        let _ = agb::rng::gen();
 
         state.frame(&object, &input, &mut mixer);
     }
