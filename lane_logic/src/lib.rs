@@ -358,7 +358,7 @@ impl Board {
         });
         pos.insert(PlacedCard {
             belonging_player: None,
-            position: Position((0, 1).into()),
+            position: Position((1, 0).into()),
             card: CardType::Score.to_data(),
         });
 
