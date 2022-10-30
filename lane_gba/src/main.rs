@@ -179,10 +179,12 @@ fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
     score
 }
 
+type ScoreCalculation = dyn Fn(&MoveResult, Player) -> i32;
+
 struct BestMoveFinder {
     game_state: State,
     find_state: FindState,
-    score_function: Box<dyn Fn(&MoveResult, Player) -> i32>,
+    score_function: Box<ScoreCalculation>,
 }
 
 enum FindState {
@@ -196,7 +198,7 @@ enum FindState {
 }
 
 impl BestMoveFinder {
-    fn new(game_state: State, score_function: Box<dyn Fn(&MoveResult, Player) -> i32>) -> Self {
+    fn new(game_state: State, score_function: Box<ScoreCalculation>) -> Self {
         let possible = game_state.enumerate_possible_moves();
         BestMoveFinder {
             find_state: FindState::CalculateScores {
