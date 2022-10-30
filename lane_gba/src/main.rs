@@ -229,7 +229,7 @@ impl<'controller> MyState<'controller> {
         self.camera_position = (self.camera_position * 4 + self.average_position()) / 5;
 
         let position_difference: Vector2D<Num<i32, 8>> =
-            Vector2D::new(WIDTH, HEIGHT).change_base() / 2 - self.camera_position;
+            Vector2D::new(WIDTH, HEIGHT - 36).change_base() / 2 - self.camera_position;
 
         let screen_space = Rect::new((0, 0).into(), Vector2D::new(WIDTH, HEIGHT).change_base());
 
@@ -630,12 +630,14 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
+            HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Ghost)
         ],
         alloc::vec![
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
+            HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Ghost)
         ],
         Player::A,
