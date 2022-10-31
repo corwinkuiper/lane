@@ -5,10 +5,17 @@
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
 #![feature(drain_filter)]
 
+use core::cell::RefCell;
+
 use agb::{
     display::{
+        font::TextRenderer,
         object::{Graphics, Object, ObjectController, Sprite, Tag},
-        HEIGHT, WIDTH,
+        tiled::{
+            DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileSetting, TiledMap,
+            VRamManager,
+        },
+        Font, Priority, HEIGHT, WIDTH,
     },
     fixnum::{Num, Rect, Vector2D},
     include_aseprite,
@@ -24,6 +31,10 @@ use lane_logic::{
 };
 use slotmap::{DefaultKey, SecondaryMap};
 
+const FONT_20: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 20);
+
+const FONT_15: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 15);
+
 const INCORRECT: &[u8] = agb::include_wav!("sfx/incorrect.wav");
 
 extern crate alloc;
@@ -33,9 +44,10 @@ const CARDS: &Graphics = include_aseprite!(
     "gfx/arrow-right.aseprite",
     "gfx/arrow-down.aseprite",
     "gfx/cards_double.aseprite",
-    "gfx/action.aseprite"
+    "gfx/action.aseprite",
+    "gfx/chevron.aseprite"
 );
-
+const CHEVRON: &Sprite = CARDS.tags().get("Chevron").sprite(0);
 const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
 const ARROW_DOWN: &Sprite = CARDS.tags().get("Arrow Down").sprite(0);
 
@@ -129,6 +141,7 @@ struct MyState<'controller> {
     move_finder: Option<BestMoveFinder>,
     control_mode: ControlMode,
     pick_help: PickHelp<'controller>,
+    winner: Option<Player>,
 }
 
 struct PickHelp<'controller> {
@@ -384,6 +397,7 @@ impl<'controller> MyState<'controller> {
             move_finder: None,
             control_mode: control,
             pick_help: PickHelp::new(object),
+            winner: None,
         };
 
         state.pick_help.hide();
@@ -411,6 +425,7 @@ impl<'controller> MyState<'controller> {
         object: &'controller ObjectController,
         input: &ButtonController,
         mixer: &mut Mixer,
+        text: &mut TextRender,
     ) {
         // progress the animations
         self.update_animation();
@@ -427,6 +442,11 @@ impl<'controller> MyState<'controller> {
             let pos = (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
             board_card.card_object.set_position(pos);
             let bounding = Rect::new(pos, CONVERSION_FACTOR.floor());
+            board_card.card_object.set_priority(Priority::P1);
+            board_card
+                .colour_object
+                .as_mut()
+                .map(|f| f.set_priority(Priority::P1));
             if bounding.touches(&screen_space) {
                 board_card.card_object.show();
                 board_card.colour_object.as_mut().map(|f| f.show());
@@ -440,23 +460,75 @@ impl<'controller> MyState<'controller> {
             }
         }
 
-        if self.playing_animations.is_empty() {
-            let _result = match self.control_mode {
+        if self.playing_animations.is_empty() && self.winner.is_none() {
+            match self.control_mode {
                 ControlMode::TwoHuman => {
-                    self.do_human_turn(position_difference, input, object, mixer)
+                    self.do_human_turn(position_difference, input, object, mixer);
+                    match self.winner {
+                        Some(Player::A) => text.write(
+                            &FONT_20,
+                            (10_u16, 10_u16).into(),
+                            format_args!("The winner is\n  Player A"),
+                        ),
+                        Some(Player::B) => text.write(
+                            &FONT_20,
+                            (10_u16, 10_u16).into(),
+                            format_args!("The winner is\n  Player B"),
+                        ),
+                        None => {}
+                    }
                 }
                 ControlMode::AI(ai, player) => {
                     if player == self.game_state.turn() {
-                        self.do_ai_turn(ai, object)
+                        self.do_ai_turn(ai, object);
                     } else {
-                        self.do_human_turn(position_difference, input, object, mixer)
+                        self.do_human_turn(position_difference, input, object, mixer);
+                    }
+
+                    if let Some(p) = self.winner {
+                        if p == player {
+                            text.write(
+                                &FONT_20,
+                                (5_u16, 5_u16).into(),
+                                format_args!("The winner is\nThe Computer"),
+                            )
+                        } else {
+                            text.write(
+                                &FONT_20,
+                                (5_u16, 5_u16).into(),
+                                format_args!("The winner is\n     You"),
+                            )
+                        }
                     }
                 }
-                ControlMode::TwoAI(ai1, ai2) => match self.game_state.turn() {
-                    Player::A => self.do_ai_turn(ai1, object),
-                    Player::B => self.do_ai_turn(ai2, object),
-                },
+                ControlMode::TwoAI(ai1, ai2) => {
+                    match self.game_state.turn() {
+                        Player::A => self.do_ai_turn(ai1, object),
+                        Player::B => self.do_ai_turn(ai2, object),
+                    };
+                    match self.winner {
+                        Some(Player::A) => text.write(
+                            &FONT_20,
+                            (5_u16, 5_u16).into(),
+                            format_args!("The winner is\n    AI 1"),
+                        ),
+                        Some(Player::B) => text.write(
+                            &FONT_20,
+                            (5_u16, 5_u16).into(),
+                            format_args!("The winner is\n    AI 2"),
+                        ),
+                        None => {}
+                    }
+                }
             };
+
+            if self.winner.is_some() {
+                text.write(
+                    &FONT_15,
+                    (8_u16, 18_u16).into(),
+                    format_args!("Press Start"),
+                );
+            }
         }
     }
 
@@ -475,7 +547,8 @@ impl<'controller> MyState<'controller> {
 
         if let Some(m) = move_finder.do_work(10) {
             let result = self.game_state.execute_move(&m);
-            agb::println!("The winner is... {:?}", result.winner);
+
+            self.winner = result.winner;
 
             self.update_representation(&result, object);
 
@@ -507,7 +580,7 @@ impl<'controller> MyState<'controller> {
                 // woah!
                 let result = self.game_state.execute_move(&desired_move);
 
-                agb::println!("The winner is... {:?}", result.winner);
+                self.winner = result.winner;
 
                 self.update_representation(&result, object);
 
@@ -916,8 +989,142 @@ const CONVERSION_FACTOR: Vector2D<Num<i32, 8>> = Vector2D {
     y: Num::from_raw(16 << 8),
 };
 
+struct TextRender<'gfx> {
+    bg: MapLoan<'gfx, RegularMap>,
+    vram: &'gfx RefCell<VRamManager>,
+    tile: DynamicTile<'gfx>,
+}
+
+impl<'gfx> TextRender<'gfx> {
+    fn new(bg: MapLoan<'gfx, RegularMap>, vram: &'gfx RefCell<VRamManager>) -> Self {
+        let dyn_tile = vram.borrow_mut().new_dynamic_tile().fill_with(0);
+        let mut tr = TextRender {
+            bg,
+            vram,
+            tile: dyn_tile,
+        };
+        tr.clear();
+        tr.bg.show();
+        tr
+    }
+
+    fn commit(&mut self) {
+        self.bg.commit(&mut self.vram.borrow_mut());
+    }
+
+    fn clear(&mut self) {
+        let vram = &mut self.vram.borrow_mut();
+
+        for y in 0..20u16 {
+            for x in 0..30u16 {
+                self.bg.set_tile(
+                    vram,
+                    (x, y).into(),
+                    &self.tile.tile_set(),
+                    TileSetting::from_raw(self.tile.tile_index()),
+                );
+            }
+        }
+    }
+
+    fn write(&mut self, font: &Font, position: Vector2D<u16>, output: core::fmt::Arguments) {
+        use core::fmt::Write;
+
+        let vram = &mut self.vram.borrow_mut();
+        let mut writer = font.render_text(position, 1, 0, &mut self.bg, vram);
+        let _ = write!(&mut writer, "{}", output);
+
+        writer.commit();
+    }
+}
+
+impl Drop for TextRender<'_> {
+    fn drop(&mut self) {
+        self.bg.clear(&mut self.vram.borrow_mut());
+    }
+}
+
+struct MenuCursor<'controller> {
+    object_left: Object<'controller>,
+    object_right: Object<'controller>,
+    position: usize,
+}
+
+struct Menu<'controller> {
+    cursor: MenuCursor<'controller>,
+}
+
+const MENU_OPTIONS: &[&str] = &["Trivial", "Medium", "Hard", "Watch", "Pass the Console"];
+
+impl<'controller> Menu<'controller> {
+    fn new(object: &'controller ObjectController, text: &mut TextRender) -> Self {
+        text.write(
+            &FONT_15,
+            (5_u16, 2_u16).into(),
+            format_args!("{}", MENU_OPTIONS.join("\n")),
+        );
+
+        let mut object_left = object.object_sprite(CHEVRON);
+        let mut object_right = object.object_sprite(CHEVRON);
+
+        object_left.hide();
+        object_right.hide();
+
+        object_right.set_hflip(true);
+
+        Self {
+            cursor: MenuCursor {
+                object_left,
+                object_right,
+                position: 0,
+            },
+        }
+    }
+
+    fn frame(&mut self, input: &ButtonController) -> Option<ControlMode> {
+        self.cursor.position = ((self.cursor.position as i32) + input.just_pressed_y_tri() as i32)
+            .rem_euclid(MENU_OPTIONS.len() as i32) as usize;
+
+        let y_pos = 2 * 8 + 16 * self.cursor.position as i32 + 3;
+
+        let x_pos = 5 * 8 + 9 * MENU_OPTIONS[self.cursor.position].len() as i32 + 8;
+
+        self.cursor.object_left.set_position((3 * 8, y_pos).into());
+        self.cursor.object_right.set_position((x_pos, y_pos).into());
+
+        self.cursor.object_left.show();
+        self.cursor.object_right.show();
+
+        if input.is_just_pressed(Button::A) {
+            match self.cursor.position {
+                0 => Some(ControlMode::AI(AIControl::Negative, Player::B)),
+                1 => Some(ControlMode::AI(AIControl::WithRandom(50), Player::B)),
+                2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
+                3 => Some(ControlMode::TwoAI(
+                    AIControl::WithRandom(4),
+                    AIControl::WithRandom(4),
+                )),
+                4 => Some(ControlMode::TwoHuman),
+                _ => unreachable!(),
+            }
+        } else {
+            None
+        }
+    }
+}
+
 fn battle(gba: &mut agb::Gba) {
     let object = gba.display.object.get();
+    let (gfx, mut vram) = gba.display.video.tiled0();
+
+    vram.set_background_palette_raw(&[0x0000, 0xffff]);
+
+    let vram_cell = RefCell::new(vram);
+
+    let mut text_render = TextRender::new(
+        gfx.background(Priority::P0, RegularBackgroundSize::Background32x32),
+        &vram_cell,
+    );
 
     let vblank = VBlank::get();
     let mut input = ButtonController::new();
@@ -944,19 +1151,42 @@ fn battle(gba: &mut agb::Gba) {
         Player::A,
     );
 
-    let mut state = MyState::new(
-        game_state,
-        &object,
-        ControlMode::AI(AIControl::WithRandom(16), Player::B),
-    );
-
     loop {
-        mixer.frame();
-        vblank.wait_for_vblank();
-        object.commit();
-        input.update();
-        let _ = agb::rng::gen();
+        let mode = {
+            let mut menu = Menu::new(&object, &mut text_render);
 
-        state.frame(&object, &input, &mut mixer);
+            loop {
+                mixer.frame();
+                vblank.wait_for_vblank();
+                text_render.commit();
+                object.commit();
+                input.update();
+                let _ = agb::rng::gen();
+
+                if let Some(mode) = menu.frame(&input) {
+                    break mode;
+                }
+            }
+        };
+
+        text_render.clear();
+        {
+            let mut state = MyState::new(game_state.clone(), &object, mode);
+
+            loop {
+                mixer.frame();
+                vblank.wait_for_vblank();
+                text_render.commit();
+                object.commit();
+                input.update();
+
+                state.frame(&object, &input, &mut mixer, &mut text_render);
+
+                if input.is_just_pressed(Button::START) && state.winner.is_some() {
+                    break;
+                }
+            }
+        }
+        text_render.clear();
     }
 }
