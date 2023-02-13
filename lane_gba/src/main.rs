@@ -23,8 +23,9 @@ use agb::{
     interrupt::{Interrupt, VBlank},
     sound::mixer::{Frequency, Mixer, SoundChannel},
 };
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use async_evaluator::Evaluator;
+use game_tree_search::{AIControl, ControlMode};
 use lane_logic::{
     card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove,
     PlaceCardMove, Player, Position, PushCardMove, State,
@@ -32,6 +33,7 @@ use lane_logic::{
 use slotmap::{DefaultKey, SecondaryMap};
 
 mod async_evaluator;
+mod game_tree_search;
 
 const FONT_20: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 20);
 
@@ -188,121 +190,6 @@ impl<'controller> PickHelp<'controller> {
         self.pick.set_sprite(object.sprite(PICK.sprite(0)));
         self.push.set_sprite(object.sprite(PUSH.sprite(0)));
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum AIControl {
-    Best,
-    WithRandom(i32),
-    Negative,
-}
-
-impl AIControl {
-    fn move_finder(&self, state: State) -> Evaluator<Option<Move>> {
-        agb::println!("Creating move finder");
-
-        match *self {
-            AIControl::Best => {
-                Evaluator::new(find_best_move(state, Box::new(calculate_state_score), 1))
-            }
-            AIControl::WithRandom(v) => Evaluator::new(find_best_move(
-                state,
-                Box::new(move |result, player| {
-                    calculate_state_score(result, player) + agb::rng::gen() % v - v / 2
-                }),
-                1,
-            )),
-            AIControl::Negative => Evaluator::new(find_best_move(
-                state,
-                Box::new(|result, player| -calculate_state_score(result, player)),
-                1,
-            )),
-        }
-    }
-}
-
-enum ControlMode {
-    TwoHuman,
-    AI(AIControl, Player),
-    TwoAI(AIControl, AIControl),
-}
-
-fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
-    let mut score: i32 = 0;
-
-    let alternate_turn = match current_turn {
-        Player::A => Player::B,
-        Player::B => Player::A,
-    };
-
-    if result.winner == Some(current_turn) {
-        score += 100000000;
-    }
-
-    if result.winner == Some(alternate_turn) {
-        score -= 100000000;
-    }
-
-    score += result.score.player(current_turn) as i32;
-    score -= result.score.player(alternate_turn) as i32 * 4;
-
-    score
-}
-
-type ScoreCalculation = dyn Fn(&MoveResult, Player) -> i32;
-
-async fn find_best_move(
-    game_state: State,
-    score_function: Box<ScoreCalculation>,
-    yeild: usize,
-) -> Option<Move> {
-    let mut counter = 0;
-    let mut should_yeild = || {
-        counter += 1;
-        if counter > yeild {
-            counter = 0;
-            true
-        } else {
-            false
-        }
-    };
-
-    let possible_moves = game_state
-        .enumerate_possible_moves_async(yeild, async_evaluator::yeild)
-        .await;
-
-    async_evaluator::yeild().await;
-
-    let player = game_state.turn();
-
-    let mut scored_moves = Vec::new();
-
-    for move_to_check in possible_moves {
-        let result = game_state.clone().execute_move(&move_to_check);
-        let socre = score_function(&result, player);
-
-        if should_yeild() {
-            async_evaluator::yeild().await;
-        }
-
-        scored_moves.push((move_to_check, socre));
-    }
-
-    async_evaluator::yeild().await;
-
-    let max_score = scored_moves.iter().max_by_key(|x| x.1)?.1;
-
-    async_evaluator::yeild().await;
-
-    scored_moves.retain(|(_, s)| *s == max_score);
-
-    async_evaluator::yeild().await;
-
-    let ran = agb::rng::gen() as usize;
-
-    let (desired_move, _) = scored_moves.swap_remove(ran % scored_moves.len());
-
-    Some(desired_move)
 }
 
 impl<'controller> MyState<'controller> {
