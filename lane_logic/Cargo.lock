@@ -4,14 +4,18 @@ version = 3
 
 [[package]]
 name = "agb_fixnum"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dbb17883387eac6189bcce811cdd36d889656670d2172dd44b43c97b524bf32"
 dependencies = [
  "agb_macros",
 ]
 
 [[package]]
 name = "agb_macros"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "249e3d3050dedc5a7e958fe2d92d75a0448942c99ba20651977de213e91967f6"
 dependencies = [
  "proc-macro2",
  "quote",

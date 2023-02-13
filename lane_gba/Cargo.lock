@@ -16,7 +16,9 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "agb"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57630006e03e708495e0f65eb0417be52b845efd81649af6a70da4ff39e8fbbf"
 dependencies = [
  "agb_fixnum",
  "agb_image_converter",
@@ -30,14 +32,18 @@ dependencies = [
 
 [[package]]
 name = "agb_fixnum"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dbb17883387eac6189bcce811cdd36d889656670d2172dd44b43c97b524bf32"
 dependencies = [
  "agb_macros",
 ]
 
 [[package]]
 name = "agb_image_converter"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a355c6da0cb6fb5c37639736723b0f1984ccd3a60c6c98380339466466dc10e"
 dependencies = [
  "asefile",
  "fontdue",
@@ -51,7 +57,9 @@ dependencies = [
 
 [[package]]
 name = "agb_macros"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "249e3d3050dedc5a7e958fe2d92d75a0448942c99ba20651977de213e91967f6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -60,7 +68,9 @@ dependencies = [
 
 [[package]]
 name = "agb_sound_converter"
-version = "0.12.2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa5de27af08f534021984469a0d4004f1f0fdc6af6f0f42223b05bfa0e32fa44"
 dependencies = [
  "hound",
  "proc-macro2",

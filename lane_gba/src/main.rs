@@ -4,12 +4,12 @@
 #![cfg_attr(test, reexport_test_harness_main = "test_main")]
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
 #![feature(drain_filter)]
+#![feature(allocator_api)]
 
 use core::cell::RefCell;
 
 use agb::{
     display::{
-        font::TextRenderer,
         object::{Graphics, Object, ObjectController, Sprite, Tag},
         tiled::{
             DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileSetting, TiledMap,
@@ -20,16 +20,18 @@ use agb::{
     fixnum::{Num, Rect, Vector2D},
     include_aseprite,
     input::{Button, ButtonController},
-    interrupt::VBlank,
+    interrupt::{Interrupt, VBlank},
     sound::mixer::{Frequency, Mixer, SoundChannel},
 };
 use alloc::{boxed::Box, vec::Vec};
+use async_evaluator::Evaluator;
 use lane_logic::{
-    card::{score, CardType},
-    Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove, PlaceCardMove,
-    Player, Position, PushCardMove, State,
+    card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove,
+    PlaceCardMove, Player, Position, PushCardMove, State,
 };
 use slotmap::{DefaultKey, SecondaryMap};
+
+mod async_evaluator;
 
 const FONT_20: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 20);
 
@@ -138,7 +140,7 @@ struct MyState<'controller> {
     camera_position: Vector2D<Num<i32, 8>>,
     select_arrow: Option<Object<'controller>>,
     hand: Vec<CardInHand<'controller>>,
-    move_finder: Option<BestMoveFinder>,
+    move_finder: Option<Evaluator<Option<Move>>>,
     control_mode: ControlMode,
     pick_help: PickHelp<'controller>,
     winner: Option<Player>,
@@ -196,19 +198,25 @@ enum AIControl {
 }
 
 impl AIControl {
-    fn move_finder(&self, state: State) -> BestMoveFinder {
+    fn move_finder(&self, state: State) -> Evaluator<Option<Move>> {
+        agb::println!("Creating move finder");
+
         match *self {
-            AIControl::Best => BestMoveFinder::new(state, Box::new(calculate_state_score)),
-            AIControl::WithRandom(v) => BestMoveFinder::new(
+            AIControl::Best => {
+                Evaluator::new(find_best_move(state, Box::new(calculate_state_score), 1))
+            }
+            AIControl::WithRandom(v) => Evaluator::new(find_best_move(
                 state,
                 Box::new(move |result, player| {
                     calculate_state_score(result, player) + agb::rng::gen() % v - v / 2
                 }),
-            ),
-            AIControl::Negative => BestMoveFinder::new(
+                1,
+            )),
+            AIControl::Negative => Evaluator::new(find_best_move(
                 state,
                 Box::new(|result, player| -calculate_state_score(result, player)),
-            ),
+                1,
+            )),
         }
     }
 }
@@ -243,79 +251,58 @@ fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
 
 type ScoreCalculation = dyn Fn(&MoveResult, Player) -> i32;
 
-struct BestMoveFinder {
+async fn find_best_move(
     game_state: State,
-    find_state: FindState,
     score_function: Box<ScoreCalculation>,
-}
-
-enum FindState {
-    CalculateScores {
-        possible_moves: Vec<Move>,
-        scored_moves: Vec<(Move, i32)>,
-    },
-    FindBest {
-        scored_moves: Vec<(Move, i32)>,
-    },
-}
-
-impl BestMoveFinder {
-    fn new(game_state: State, score_function: Box<ScoreCalculation>) -> Self {
-        let possible = game_state.enumerate_possible_moves();
-        BestMoveFinder {
-            find_state: FindState::CalculateScores {
-                scored_moves: Vec::with_capacity(possible.len()),
-                possible_moves: possible,
-            },
-            game_state,
-            score_function,
+    yeild: usize,
+) -> Option<Move> {
+    let mut counter = 0;
+    let mut should_yeild = || {
+        counter += 1;
+        if counter > yeild {
+            counter = 0;
+            true
+        } else {
+            false
         }
+    };
+
+    let possible_moves = game_state
+        .enumerate_possible_moves_async(yeild, async_evaluator::yeild)
+        .await;
+
+    async_evaluator::yeild().await;
+
+    let player = game_state.turn();
+
+    let mut scored_moves = Vec::new();
+
+    for move_to_check in possible_moves {
+        let result = game_state.clone().execute_move(&move_to_check);
+        let socre = score_function(&result, player);
+
+        if should_yeild() {
+            async_evaluator::yeild().await;
+        }
+
+        scored_moves.push((move_to_check, socre));
     }
 
-    fn do_work(&mut self, steps: usize) -> Option<Move> {
-        match &mut self.find_state {
-            FindState::CalculateScores {
-                possible_moves,
-                scored_moves,
-            } => {
-                let player = self.game_state.turn();
+    async_evaluator::yeild().await;
 
-                for _ in 0..steps {
-                    let m = possible_moves.pop();
-                    if let Some(m) = m {
-                        let result = self.game_state.clone().execute_move(&m);
-                        let score = (self.score_function)(&result, player);
-                        scored_moves.push((m, score))
-                    } else {
-                        break;
-                    }
-                }
+    let max_score = scored_moves.iter().max_by_key(|x| x.1)?.1;
 
-                if possible_moves.is_empty() {
-                    let mut new_score = Vec::new();
-                    core::mem::swap(scored_moves, &mut new_score);
+    async_evaluator::yeild().await;
 
-                    self.find_state = FindState::FindBest {
-                        scored_moves: new_score,
-                    }
-                }
+    scored_moves.retain(|(_, s)| *s == max_score);
 
-                None
-            }
+    async_evaluator::yeild().await;
 
-            FindState::FindBest { scored_moves } => {
-                let max_score = scored_moves.iter().max_by_key(|x| x.1)?.1;
+    let ran = agb::rng::gen() as usize;
 
-                scored_moves.retain(|(_, s)| *s == max_score);
+    let (desired_move, _) = scored_moves.swap_remove(ran % scored_moves.len());
 
-                let ran = agb::rng::gen() as usize;
-
-                let (desired_move, _) = scored_moves.swap_remove(ran % scored_moves.len());
-
-                Some(desired_move)
-            }
-        }
-    }
+    Some(desired_move)
 }
 
 impl<'controller> MyState<'controller> {
@@ -415,7 +402,7 @@ impl<'controller> MyState<'controller> {
                 },
             );
         }
-        state.camera_position = state.average_position();
+        state.camera_position = state.average_position() + (1, 1).into();
 
         state
     }
@@ -431,6 +418,8 @@ impl<'controller> MyState<'controller> {
         self.update_animation();
 
         // Update rendered position of objects
+
+        let old_camera_position = self.camera_position;
         self.camera_position = (self.camera_position * 4 + self.average_position()) / 5;
 
         let position_difference: Vector2D<Num<i32, 8>> =
@@ -438,25 +427,45 @@ impl<'controller> MyState<'controller> {
 
         let screen_space = Rect::new((0, 0).into(), Vector2D::new(WIDTH, HEIGHT).change_base());
 
-        for (_, board_card) in self.cards.iter_mut() {
-            let pos = (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
-            board_card.card_object.set_position(pos);
-            let bounding = Rect::new(pos, CONVERSION_FACTOR.floor());
-            board_card.card_object.set_priority(Priority::P1);
-            board_card
-                .colour_object
-                .as_mut()
-                .map(|f| f.set_priority(Priority::P1));
-            if bounding.touches(&screen_space) {
-                board_card.card_object.show();
-                board_card.colour_object.as_mut().map(|f| f.show());
-            } else {
-                board_card.card_object.hide();
-                board_card.colour_object.as_mut().map(|f| f.hide());
+        if !self.playing_animations.is_empty() || self.camera_position != old_camera_position {
+            for (_, board_card) in self.cards.iter_mut() {
+                let pos =
+                    (board_card.position + position_difference - CONVERSION_FACTOR / 2).floor();
+                board_card.card_object.set_position(pos);
+                let bounding = Rect::new(pos, CONVERSION_FACTOR.floor());
+                board_card.card_object.set_priority(Priority::P1);
+                board_card
+                    .colour_object
+                    .as_mut()
+                    .map(|f| f.set_priority(Priority::P1));
+                if bounding.touches(screen_space) {
+                    board_card.card_object.show();
+                    board_card.colour_object.as_mut().map(|f| f.show());
+                } else {
+                    board_card.card_object.hide();
+                    board_card.colour_object.as_mut().map(|f| f.hide());
+                }
+                if let Some(colour) = &mut board_card.colour_object {
+                    colour.set_position(pos);
+                    colour.set_z(1);
+                }
             }
-            if let Some(colour) = &mut board_card.colour_object {
-                colour.set_position(pos);
-                colour.set_z(1);
+        }
+
+        if self.winner.is_none() && self.move_finder.is_none() {
+            match self.control_mode {
+                ControlMode::TwoHuman => {}
+                ControlMode::AI(ai, player) => {
+                    if player == self.game_state.turn() {
+                        self.prepare_ai_turn(ai);
+                    }
+                }
+                ControlMode::TwoAI(ai1, ai2) => {
+                    match self.game_state.turn() {
+                        Player::A => self.prepare_ai_turn(ai1),
+                        Player::B => self.prepare_ai_turn(ai2),
+                    };
+                }
             }
         }
 
@@ -532,6 +541,11 @@ impl<'controller> MyState<'controller> {
         }
     }
 
+    fn prepare_ai_turn(&mut self, ai_mode: AIControl) {
+        self.move_finder
+            .get_or_insert_with(|| ai_mode.move_finder(self.game_state.clone()));
+    }
+
     fn do_ai_turn(
         &mut self,
         ai_mode: AIControl,
@@ -545,8 +559,9 @@ impl<'controller> MyState<'controller> {
             .move_finder
             .get_or_insert_with(|| ai_mode.move_finder(self.game_state.clone()));
 
-        if let Some(m) = move_finder.do_work(10) {
-            let result = self.game_state.execute_move(&m);
+        if let Some(m) = move_finder.result() {
+            let m = m.as_ref().unwrap();
+            let result = self.game_state.execute_move(m);
 
             self.winner = result.winner;
 
@@ -1031,10 +1046,13 @@ impl<'gfx> TextRender<'gfx> {
         use core::fmt::Write;
 
         let vram = &mut self.vram.borrow_mut();
-        let mut writer = font.render_text(position, 1, 0, &mut self.bg, vram);
-        let _ = write!(&mut writer, "{}", output);
+        let mut writer = font.render_text(position);
+        {
+            let mut writer = writer.writer(1, 0, &mut self.bg, vram);
+            let _ = write!(&mut writer, "{}", output);
+        }
 
-        writer.commit();
+        writer.commit(&mut self.bg, vram);
     }
 }
 
@@ -1130,7 +1148,6 @@ fn battle(gba: &mut agb::Gba) {
     let mut input = ButtonController::new();
 
     let mut mixer = gba.mixer.mixer(Frequency::Hz32768);
-    let _irq = mixer.setup_interrupt_handler();
     mixer.enable();
 
     let game_state = State::new(
@@ -1169,16 +1186,45 @@ fn battle(gba: &mut agb::Gba) {
             }
         };
 
+        let frame_counter = agb::sync::Static::new(0);
+        let mut expected_frame_counter = frame_counter.read();
+
+        let _v_frame_count = agb::interrupt::add_interrupt_handler(Interrupt::VBlank, |_cs| {
+            frame_counter.write(frame_counter.read() + 1);
+        });
+
         text_render.clear();
         {
             let mut state = MyState::new(game_state.clone(), &object, mode);
 
             loop {
+                let before_move_finder = get_vcount();
                 mixer.frame();
+
+                if frame_counter.read() == expected_frame_counter {
+                    if let Some(finder) = &mut state.move_finder {
+                        while get_vcount() >= 160 {
+                            if finder.do_work().is_some() {
+                                break;
+                            }
+                        }
+                        while get_vcount() < 100 {
+                            if finder.do_work().is_some() {
+                                break;
+                            }
+                        }
+                    }
+                }
+                expected_frame_counter = frame_counter.read() + 1;
+
+                let finish_clock = get_vcount();
+
                 vblank.wait_for_vblank();
                 text_render.commit();
                 object.commit();
                 input.update();
+
+                agb::println!("Between {} and {}", before_move_finder, finish_clock);
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 
@@ -1189,4 +1235,8 @@ fn battle(gba: &mut agb::Gba) {
         }
         text_render.clear();
     }
+}
+
+fn get_vcount() -> u32 {
+    unsafe { (0x0400_0006 as *mut u16).read_volatile() as u32 }
 }

@@ -12,9 +12,9 @@ cp -r html export
 
 cd export || exit
 
-arm-none-eabi-objcopy -O binary ../lane_gba/target/thumbv4t-none-eabi/release/lane "Lane.gba"
-gbafix -p -tLANE -cLANE -mGC "Lane.gba" 
+arm-none-eabi-objcopy -O binary ../lane_gba/target/thumbv4t-none-eabi/release/lane "Lane_jam.gba"
+gbafix -p -tLANE -cLANE -mGC "Lane_jam.gba" 
 
-cp "Lane.gba" html/game.gba
+cp "Lane_jam.gba" html/game.gba
 
 (cd html || return && zip -r ../html.zip .)

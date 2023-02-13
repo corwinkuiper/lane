@@ -1,7 +1,7 @@
 #![no_std]
 #[warn(clippy::all)]
 use core::ops::Add;
-use core::ops::Neg;
+use core::{future::Future, ops::Neg};
 
 use agb_fixnum::Vector2D;
 
@@ -319,7 +319,7 @@ impl State {
             if let HeldCard::Avaliable(_card) = card {
                 for (position, direction) in possible.iter().copied() {
                     moves.push(Move::PlaceCard(PlaceCardMove {
-                        direction: direction,
+                        direction,
                         coordinate: position,
                         card: HeldCardIndex(idx),
                     }))
@@ -331,6 +331,85 @@ impl State {
         for (idx, card) in self.board.positions.iter() {
             if card.belonging_player != Some(self.turn()) {
                 continue;
+            }
+
+            moves.push(Move::PickCard(PickCardMove { card: Index(idx) }));
+
+            for direction in DIRECTIONS {
+                let m = Move::PushCard(PushCardMove {
+                    place: Index(idx),
+                    direction,
+                });
+                if self.can_execute_move(&m) {
+                    moves.push(m);
+                }
+            }
+        }
+
+        moves
+    }
+
+    pub async fn enumerate_possible_moves_async<F, Fut>(
+        &self,
+        yeild_every: usize,
+        yeild: F,
+    ) -> Vec<Move>
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        let mut moves = Vec::new();
+
+        let mut counter = 0;
+        let mut should_yeild = || {
+            counter += 1;
+            if counter > yeild_every {
+                counter = 0;
+                true
+            } else {
+                false
+            }
+        };
+
+        // create list of positions that is valid to place
+        let mut possible = Vec::new();
+
+        for (_idx, card) in self.board.positions.iter() {
+            for direction in DIRECTIONS {
+                let desired_spot = card.position + direction;
+                if self.board.no_cards_in_direction(card.position, direction) {
+                    possible.push((desired_spot, -direction));
+                    if should_yeild() {
+                        yeild().await;
+                    }
+                }
+            }
+        }
+
+        // go over the hand of the current player
+        for (idx, card) in self.turn_hand().iter().enumerate() {
+            if let HeldCard::Avaliable(_card) = card {
+                for (position, direction) in possible.iter().copied() {
+                    moves.push(Move::PlaceCard(PlaceCardMove {
+                        direction,
+                        coordinate: position,
+                        card: HeldCardIndex(idx),
+                    }));
+                    if should_yeild() {
+                        yeild().await;
+                    }
+                }
+            }
+        }
+
+        // all possible pushing moves
+        for (idx, card) in self.board.positions.iter() {
+            if card.belonging_player != Some(self.turn()) {
+                continue;
+            }
+
+            if should_yeild() {
+                yeild().await;
             }
 
             moves.push(Move::PickCard(PickCardMove { card: Index(idx) }));
