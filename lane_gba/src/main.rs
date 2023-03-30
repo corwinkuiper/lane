@@ -1013,7 +1013,7 @@ impl<'controller> Menu<'controller> {
         if input.is_just_pressed(Button::A) {
             match self.cursor.position {
                 0 => Some(ControlMode::AI(AIControl::Negative, Player::B)),
-                1 => Some(ControlMode::AI(AIControl::WithRandom(0), Player::B)),
+                1 => Some(ControlMode::AI(AIControl::WithRandom(40), Player::B)),
                 2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
                 3 => Some(ControlMode::TwoAI(
                     AIControl::WithRandom(40),
