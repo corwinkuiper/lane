@@ -1085,8 +1085,8 @@ fn battle(gba: &mut agb::Gba) {
             let mut state = MyState::new(game_state.clone(), &object, mode);
 
             loop {
-                let before_move_finder = get_vcount();
                 mixer.frame();
+                let before_move_finder = get_vcount();
 
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
