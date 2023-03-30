@@ -123,9 +123,12 @@ async fn find_best_move(
         let resultant_score = score_function.score(&result, &next_state, player);
         let score = minimax(&score_function, next_state, &result, 1, player, alpha, beta).await;
 
+        if score > best_score {
+            scored_moves.push((move_to_check, score, resultant_score));
+        }
+
         best_score = best_score.max(score);
         alpha = best_score.max(alpha);
-        scored_moves.push((move_to_check, score, resultant_score));
     }
 
     if best_score < -100000 {
@@ -140,11 +143,11 @@ async fn find_best_move(
 
     scored_moves.retain(|(_, s, _)| *s == best_score);
 
+    assert!(scored_moves.len() == 1);
+
     async_evaluator::yeild().await;
 
-    let ran = agb::rng::gen() as usize;
-
-    let (desired_move, _, resultant_score) = scored_moves.swap_remove(ran % scored_moves.len());
+    let (desired_move, _, resultant_score) = scored_moves.pop().unwrap();
 
     agb::println!(
         "Playing a move that is rated in the long term {} and currently {}",
@@ -174,14 +177,6 @@ async fn minimax(
     let possible_moves = node
         .enumerate_possible_moves_async(1, async_evaluator::yeild)
         .await;
-
-    // agb::println!(
-    //     "Eval of {} positions at a depth of {}. Optimising for player {:?} on player {:?}'s turn",
-    //     possible_moves.len(),
-    //     depth,
-    //     me,
-    //     node.turn()
-    // );
 
     if node.turn() == me {
         let mut best_evaluation = i32::MIN;
