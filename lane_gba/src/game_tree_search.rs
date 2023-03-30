@@ -56,8 +56,11 @@ fn calculate_state_score(result: &MoveResult, current_turn: Player) -> i32 {
         score -= 100000000;
     }
 
-    score += result.score.player(current_turn) as i32;
-    score -= result.score.player(alternate_turn) as i32 * 4;
+    let my_score = result.score.player(current_turn) as i32;
+    score += my_score.pow(2);
+
+    let opponent_score = result.score.player(alternate_turn) as i32;
+    score -= opponent_score.pow(3);
 
     score
 }
