@@ -180,7 +180,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a62391ecb864cf12ed06b2af4eda2e609b97657950d6a8f06841b17726ab253"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.11.2",
  "ttf-parser",
 ]
 
@@ -203,6 +203,12 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
  "ahash",
 ]
+
+[[package]]
+name = "hashbrown"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 
 [[package]]
 name = "hound"
@@ -239,6 +245,7 @@ name = "lane_logic"
 version = "0.1.0"
 dependencies = [
  "agb_fixnum",
+ "hashbrown 0.13.2",
  "slotmap",
 ]
 
