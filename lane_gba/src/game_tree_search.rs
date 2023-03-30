@@ -152,7 +152,7 @@ async fn find_best_move(
     Some(desired_move)
 }
 
-const MAX_DEPTH: u32 = 4;
+const MAX_DEPTH: u32 = 2;
 
 #[async_recursion]
 async fn minimax(
