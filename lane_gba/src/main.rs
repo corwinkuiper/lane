@@ -10,6 +10,7 @@ use core::cell::RefCell;
 
 use agb::{
     display::{
+        font::TextRenderer,
         object::{Graphics, Object, ObjectController, Sprite, Tag},
         tiled::{
             DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileSetting, TiledMap,
@@ -40,6 +41,7 @@ const FONT_20: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 20);
 const FONT_15: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 15);
 
 const INCORRECT: &[u8] = agb::include_wav!("sfx/incorrect.wav");
+const MIST_CITY: &[u8] = agb::include_wav!("sfx/mist_city.wav");
 
 extern crate alloc;
 
@@ -895,6 +897,7 @@ struct TextRender<'gfx> {
     bg: MapLoan<'gfx, RegularMap>,
     vram: &'gfx RefCell<VRamManager>,
     tile: DynamicTile<'gfx>,
+    writers: Vec<TextRenderer<'gfx>>,
 }
 
 impl<'gfx> TextRender<'gfx> {
@@ -904,6 +907,7 @@ impl<'gfx> TextRender<'gfx> {
             bg,
             vram,
             tile: dyn_tile,
+            writers: Vec::new(),
         };
         tr.clear();
         tr.bg.show();
@@ -917,6 +921,11 @@ impl<'gfx> TextRender<'gfx> {
     fn clear(&mut self) {
         let vram = &mut self.vram.borrow_mut();
 
+        let mut old_writers = core::mem::take(&mut self.writers);
+        for writer in old_writers.iter_mut() {
+            writer.clear(vram);
+        }
+
         for y in 0..20u16 {
             for x in 0..30u16 {
                 self.bg.set_tile(
@@ -929,7 +938,7 @@ impl<'gfx> TextRender<'gfx> {
         }
     }
 
-    fn write(&mut self, font: &Font, position: Vector2D<u16>, output: core::fmt::Arguments) {
+    fn write(&mut self, font: &'gfx Font, position: Vector2D<u16>, output: core::fmt::Arguments) {
         use core::fmt::Write;
 
         let vram = &mut self.vram.borrow_mut();
@@ -940,6 +949,7 @@ impl<'gfx> TextRender<'gfx> {
         }
 
         writer.commit(&mut self.bg, vram);
+        self.writers.push(writer);
     }
 }
 
@@ -1031,17 +1041,15 @@ fn battle(gba: &mut agb::Gba) {
         &vram_cell,
     );
 
-    let timers = gba.timers.timers();
-
-    let mut my_timer = timers.timer2;
-
-    // let _profiler = agb::interrupt::profiler(&mut my_timer, 1_000);
-
     let vblank = VBlank::get();
     let mut input = ButtonController::new();
 
     let mut mixer = gba.mixer.mixer(Frequency::Hz32768);
     mixer.enable();
+    let mut mist_city = SoundChannel::new(MIST_CITY);
+    mist_city.stereo();
+    mist_city.should_loop();
+    mixer.play_sound(mist_city);
 
     let game_state = State::new(
         alloc::vec![
@@ -1092,6 +1100,8 @@ fn battle(gba: &mut agb::Gba) {
 
             loop {
                 mixer.frame();
+                let before_move_finder = get_vcount();
+                let work_to_do = state.move_finder.is_some();
 
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
@@ -1108,11 +1118,16 @@ fn battle(gba: &mut agb::Gba) {
                     }
                 }
                 expected_frame_counter = frame_counter.read() + 1;
+                let finish_clock = get_vcount();
 
                 vblank.wait_for_vblank();
                 text_render.commit();
                 object.commit();
                 input.update();
+
+                if work_to_do {
+                    agb::println!("Between {} and {}", before_move_finder, finish_clock);
+                }
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 

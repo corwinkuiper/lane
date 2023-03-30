@@ -40,7 +40,7 @@ use core::ops::BitXor;
 /// out-performs an FNV-based hash within rustc itself -- the collision rate is
 /// similar or slightly worse than FNV, but the speed of the hash function
 /// itself is much higher because it works on up to 8 bytes at a time.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct FxHasher {
     hash: usize,
 }
@@ -58,13 +58,6 @@ impl BuildHasher for FxBuildHasher {
 
     fn build_hasher(&self) -> Self::Hasher {
         Default::default()
-    }
-}
-
-impl Default for FxHasher {
-    #[inline]
-    fn default() -> FxHasher {
-        FxHasher { hash: 0 }
     }
 }
 
