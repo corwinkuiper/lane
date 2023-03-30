@@ -120,12 +120,12 @@ async fn find_best_move(
 
     let player = game_state.turn();
 
-    let mut scored_moves = Vec::new();
-
     let mut alpha = i32::MIN;
     let beta = i32::MAX;
 
     let mut best_score = i32::MIN;
+
+    let mut best_move = None;
 
     for move_to_check in possible_moves {
         let mut next_state = game_state.clone();
@@ -134,7 +134,7 @@ async fn find_best_move(
         let score = minimax(&score_function, next_state, &result, 1, player, alpha, beta).await;
 
         if score > best_score {
-            scored_moves.push((move_to_check, score, resultant_score));
+            best_move = Some((move_to_check, score, resultant_score));
         }
 
         best_score = best_score.max(score);
@@ -151,13 +151,7 @@ async fn find_best_move(
 
     async_evaluator::yeild().await;
 
-    scored_moves.retain(|(_, s, _)| *s == best_score);
-
-    assert!(scored_moves.len() == 1);
-
-    async_evaluator::yeild().await;
-
-    let (desired_move, _, resultant_score) = scored_moves.pop().unwrap();
+    let (desired_move, _, resultant_score) = best_move.unwrap();
 
     agb::println!(
         "Playing a move that is rated in the long term {} and currently {}",
