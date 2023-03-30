@@ -16,7 +16,8 @@ impl Card for Ghost {
                 None => break next_position,
             }
         };
-        board[self_index].position = new_position;
+
+        board.move_card(board[self_index].position, new_position);
 
         Set::from_iter([self_index])
     }

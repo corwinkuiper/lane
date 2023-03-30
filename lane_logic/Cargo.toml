@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-agb_fixnum = { version = "0.13.0" }
-slotmap = { version = "1.0", default-features = false }
+agb_fixnum = { version = "0.13" }
+hashbrown = { version = "0.13", default-features = false }
+slotmap = { version = "1", default-features = false }

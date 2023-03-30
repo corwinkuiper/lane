@@ -24,7 +24,7 @@ impl Card for Normal {
         };
 
         moved.insert(self_index);
-        board[self_index].position = next_position;
+        board.move_card(board[self_index].position, next_position);
 
         moved
     }

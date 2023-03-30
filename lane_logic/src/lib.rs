@@ -1,12 +1,14 @@
 #![no_std]
 #[warn(clippy::all)]
 use core::ops::Add;
-use core::{future::Future, ops::Neg};
+use core::{future::Future, hash::Hash, ops::Neg};
 
 use agb_fixnum::Vector2D;
 
 use alloc::vec::Vec;
+use hashbrown::HashMap;
 use slotmap::HopSlotMap;
+mod rustc_hash;
 
 extern crate alloc;
 
@@ -84,6 +86,13 @@ pub enum Player {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Position(pub Vector2D<i32>);
+
+impl Hash for Position {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.0.x.hash(state);
+        self.0.y.hash(state);
+    }
+}
 
 impl Add<Direction> for Position {
     type Output = Self;
@@ -200,16 +209,12 @@ impl State {
                 Vec::new(),
             ),
             Move::PickCard(pick) => {
-                let card = self.board.positions.remove(pick.card.0);
-                (
-                    Vec::new(),
-                    Set::new(),
-                    alloc::vec![(pick.card, card.unwrap())],
-                )
+                let card = self.board.remove_card(pick.card);
+                (Vec::new(), Set::new(), alloc::vec![(pick.card, card)])
             }
         };
 
-        for card_in_hand in self.hands.iter_mut().map(|x| x.cards.iter_mut()).flatten() {
+        for card_in_hand in self.hands.iter_mut().flat_map(|x| x.cards.iter_mut()) {
             match card_in_hand {
                 HeldCard::Avaliable(_) => {}
                 HeldCard::Waiting {
@@ -432,6 +437,7 @@ impl State {
 #[derive(Debug, Clone)]
 struct Board {
     positions: HopSlotMap<slotmap::DefaultKey, PlacedCard>,
+    position_cache: HashMap<Position, Index, rustc_hash::FxBuildHasher>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -447,18 +453,25 @@ impl Board {
     fn new() -> Self {
         let mut pos = HopSlotMap::new();
 
-        pos.insert(PlacedCard {
+        let k1 = pos.insert(PlacedCard {
             belonging_player: None,
             position: Position((0, 0).into()),
             card: CardType::Score.to_data(),
         });
-        pos.insert(PlacedCard {
+        let k2 = pos.insert(PlacedCard {
             belonging_player: None,
             position: Position((1, 0).into()),
             card: CardType::Score.to_data(),
         });
 
-        Self { positions: pos }
+        let mut map = HashMap::with_hasher(rustc_hash::FxBuildHasher);
+
+        map.insert(Position((0, 0).into()), Index(k1));
+        map.insert(Position((1, 0).into()), Index(k2));
+        Self {
+            positions: pos,
+            position_cache: map,
+        }
     }
 
     fn score(&self) -> [usize; 2] {
@@ -481,8 +494,7 @@ impl Board {
 
         let scoring_cards = score_cards
             .iter()
-            .map(|&x| directions.iter().map(move |&y| x + y))
-            .flatten()
+            .flat_map(|&x| directions.iter().map(move |&y| x + y))
             .flat_map(|x| self.get_card_position(x))
             .collect::<Set<_>>();
 
@@ -528,18 +540,22 @@ impl Board {
     }
 
     fn get_card_position(&self, position: Position) -> Option<Index> {
-        self.positions
-            .iter()
-            .find(|(_, card)| card.position == position)
-            .map(|(key, _)| Index(key))
+        self.position_cache.get(&position).copied()
     }
 
-    fn get_card_mut(&mut self, idx: Index) -> Option<&mut PlacedCard> {
-        self.positions.get_mut(idx.0)
+    fn move_card(&mut self, current_position: Position, next_position: Position) {
+        let old = self
+            .position_cache
+            .remove(&current_position)
+            .expect("the given position should exist");
+        self[old].position = next_position;
+        self.position_cache.insert(next_position, old);
     }
 
-    fn remove_card(&mut self, idx: Index) {
-        self.positions.remove(idx.0);
+    fn remove_card(&mut self, idx: Index) -> PlacedCard {
+        let card = self.positions.remove(idx.0).unwrap();
+        self.position_cache.remove(&card.position);
+        card
     }
 
     fn add_card(&mut self, owner: Player, position: Position, card: CardData) -> Index {
@@ -548,6 +564,7 @@ impl Board {
             position,
             card,
         });
+        self.position_cache.insert(position, Index(idx));
         Index(idx)
     }
 
@@ -586,7 +603,7 @@ impl Board {
         }
         removed
             .iter()
-            .map(|&idx| (idx, self.positions.remove(idx.0).unwrap()))
+            .map(|&idx| (idx, self.remove_card(idx)))
             .collect()
     }
 
