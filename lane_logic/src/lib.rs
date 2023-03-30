@@ -1,5 +1,5 @@
 #![no_std]
-#[warn(clippy::all)]
+#![warn(clippy::all)]
 use core::ops::Add;
 use core::{future::Future, hash::Hash, ops::Neg};
 
@@ -152,10 +152,7 @@ impl State {
                             .can_place(card, self.turn, place.coordinate, place.direction)
                             == PlaceStatus::Success
                 }
-                HeldCard::Waiting {
-                    card: _,
-                    turns_until_usable: _,
-                } => false,
+                HeldCard::Waiting { .. } => false,
             },
             Move::PushCard(push) => {
                 self.board
@@ -198,10 +195,7 @@ impl State {
                         Vec::new(),
                     )
                 }
-                HeldCard::Waiting {
-                    card: _,
-                    turns_until_usable: _,
-                } => panic!("invalid move"),
+                HeldCard::Waiting { .. } => panic!("invalid move"),
             },
             Move::PushCard(push) => (
                 Vec::new(),
