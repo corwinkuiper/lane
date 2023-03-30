@@ -40,6 +40,7 @@ const FONT_20: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 20);
 const FONT_15: Font = agb::include_font!("fnt/VCR_OSD_MONO_1.001.ttf", 15);
 
 const INCORRECT: &[u8] = agb::include_wav!("sfx/incorrect.wav");
+const MIST_CITY: &[u8] = agb::include_wav!("sfx/mist_city.wav");
 
 extern crate alloc;
 
@@ -1036,6 +1037,7 @@ fn battle(gba: &mut agb::Gba) {
 
     let mut mixer = gba.mixer.mixer(Frequency::Hz32768);
     mixer.enable();
+    mixer.play_sound(SoundChannel::new(MIST_CITY));
 
     let game_state = State::new(
         alloc::vec![
