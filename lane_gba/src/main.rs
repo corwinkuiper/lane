@@ -1003,7 +1003,7 @@ impl<'controller> Menu<'controller> {
         if input.is_just_pressed(Button::A) {
             match self.cursor.position {
                 0 => Some(ControlMode::AI(AIControl::Negative, Player::B)),
-                1 => Some(ControlMode::AI(AIControl::WithRandom(50), Player::B)),
+                1 => Some(ControlMode::AI(AIControl::WithRandom(0), Player::B)),
                 2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
                 3 => Some(ControlMode::TwoAI(
                     AIControl::WithRandom(4),
@@ -1030,6 +1030,12 @@ fn battle(gba: &mut agb::Gba) {
         gfx.background(Priority::P0, RegularBackgroundSize::Background32x32),
         &vram_cell,
     );
+
+    let timers = gba.timers.timers();
+
+    let mut my_timer = timers.timer2;
+
+    // let _profiler = agb::interrupt::profiler(&mut my_timer, 1_000);
 
     let vblank = VBlank::get();
     let mut input = ButtonController::new();
@@ -1085,7 +1091,6 @@ fn battle(gba: &mut agb::Gba) {
             let mut state = MyState::new(game_state.clone(), &object, mode);
 
             loop {
-                let before_move_finder = get_vcount();
                 mixer.frame();
 
                 if frame_counter.read() == expected_frame_counter {
@@ -1104,14 +1109,10 @@ fn battle(gba: &mut agb::Gba) {
                 }
                 expected_frame_counter = frame_counter.read() + 1;
 
-                let finish_clock = get_vcount();
-
                 vblank.wait_for_vblank();
                 text_render.commit();
                 object.commit();
                 input.update();
-
-                agb::println!("Between {} and {}", before_move_finder, finish_clock);
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 
