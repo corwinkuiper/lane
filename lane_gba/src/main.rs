@@ -1092,6 +1092,7 @@ fn battle(gba: &mut agb::Gba) {
             loop {
                 mixer.frame();
                 let before_move_finder = get_vcount();
+                let work_to_do = state.move_finder.is_some();
 
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
@@ -1116,7 +1117,9 @@ fn battle(gba: &mut agb::Gba) {
                 object.commit();
                 input.update();
 
-                agb::println!("Between {} and {}", before_move_finder, finish_clock);
+                if work_to_do {
+                    agb::println!("Between {} and {}", before_move_finder, finish_clock);
+                }
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 
