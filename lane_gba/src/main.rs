@@ -10,6 +10,7 @@ use core::cell::RefCell;
 
 use agb::{
     display::{
+        font::TextRenderer,
         object::{Graphics, Object, ObjectController, Sprite, Tag},
         tiled::{
             DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileSetting, TiledMap,
@@ -896,6 +897,7 @@ struct TextRender<'gfx> {
     bg: MapLoan<'gfx, RegularMap>,
     vram: &'gfx RefCell<VRamManager>,
     tile: DynamicTile<'gfx>,
+    writers: Vec<TextRenderer<'gfx>>,
 }
 
 impl<'gfx> TextRender<'gfx> {
@@ -905,6 +907,7 @@ impl<'gfx> TextRender<'gfx> {
             bg,
             vram,
             tile: dyn_tile,
+            writers: Vec::new(),
         };
         tr.clear();
         tr.bg.show();
@@ -918,6 +921,11 @@ impl<'gfx> TextRender<'gfx> {
     fn clear(&mut self) {
         let vram = &mut self.vram.borrow_mut();
 
+        let mut old_writers = core::mem::take(&mut self.writers);
+        for writer in old_writers.iter_mut() {
+            writer.clear(vram);
+        }
+
         for y in 0..20u16 {
             for x in 0..30u16 {
                 self.bg.set_tile(
@@ -930,7 +938,7 @@ impl<'gfx> TextRender<'gfx> {
         }
     }
 
-    fn write(&mut self, font: &Font, position: Vector2D<u16>, output: core::fmt::Arguments) {
+    fn write(&mut self, font: &'gfx Font, position: Vector2D<u16>, output: core::fmt::Arguments) {
         use core::fmt::Write;
 
         let vram = &mut self.vram.borrow_mut();
@@ -941,6 +949,7 @@ impl<'gfx> TextRender<'gfx> {
         }
 
         writer.commit(&mut self.bg, vram);
+        self.writers.push(writer);
     }
 }
 
