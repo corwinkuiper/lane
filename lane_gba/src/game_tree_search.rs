@@ -95,16 +95,28 @@ fn calculate_state_score(result: &MoveResult, node: &State, current_turn: Player
     score
 }
 
+fn randomise_list<T>(items: &mut Vec<T>) {
+    // Randomise the move list
+    for i in (1..items.len()).rev() {
+        let j = agb::rng::gen() as usize % i;
+        items.swap(i, j);
+    }
+}
+
 async fn find_best_move(
     game_state: State,
     score_function: impl ScoreCalculator,
     yeild: usize,
 ) -> Option<Move> {
-    let possible_moves = game_state
+    let mut possible_moves = game_state
         .enumerate_possible_moves_async(yeild, async_evaluator::yeild)
         .await;
 
     agb::println!("Starting eval of {} positions", possible_moves.len());
+
+    async_evaluator::yeild().await;
+
+    randomise_list(&mut possible_moves);
 
     async_evaluator::yeild().await;
 
@@ -174,9 +186,15 @@ async fn minimax(
         return score_function.score(move_result_to_get_here, &node, me);
     }
 
-    let possible_moves = node
+    let mut possible_moves = node
         .enumerate_possible_moves_async(1, async_evaluator::yeild)
         .await;
+
+    async_evaluator::yeild().await;
+
+    randomise_list(&mut possible_moves);
+
+    async_evaluator::yeild().await;
 
     if node.turn() == me {
         let mut best_evaluation = i32::MIN;
@@ -196,7 +214,7 @@ async fn minimax(
             .await;
             best_evaluation = best_evaluation.max(value_of_move);
             alpha = alpha.max(best_evaluation);
-            if beta <= alpha {
+            if beta <= best_evaluation {
                 break;
             }
         }
@@ -226,7 +244,7 @@ async fn minimax(
 
             worst_evaluation = worst_evaluation.min(value_of_move);
             beta = beta.min(worst_evaluation);
-            if beta <= alpha {
+            if worst_evaluation <= alpha {
                 break;
             }
         }
