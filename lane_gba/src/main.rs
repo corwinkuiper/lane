@@ -1037,7 +1037,10 @@ fn battle(gba: &mut agb::Gba) {
 
     let mut mixer = gba.mixer.mixer(Frequency::Hz32768);
     mixer.enable();
-    mixer.play_sound(SoundChannel::new(MIST_CITY));
+    let mut mist_city = SoundChannel::new(MIST_CITY);
+    mist_city.stereo();
+    mist_city.should_loop();
+    mixer.play_sound(mist_city);
 
     let game_state = State::new(
         alloc::vec![
