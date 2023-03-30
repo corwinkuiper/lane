@@ -1016,8 +1016,8 @@ impl<'controller> Menu<'controller> {
                 1 => Some(ControlMode::AI(AIControl::WithRandom(0), Player::B)),
                 2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
                 3 => Some(ControlMode::TwoAI(
-                    AIControl::WithRandom(4),
-                    AIControl::WithRandom(4),
+                    AIControl::WithRandom(40),
+                    AIControl::WithRandom(40),
                 )),
                 4 => Some(ControlMode::TwoHuman),
                 _ => unreachable!(),

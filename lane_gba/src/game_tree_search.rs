@@ -17,7 +17,6 @@ impl ScoreCalculator for AIControl {
             AIControl::Best => calculate_state_score(result, node, player),
             AIControl::WithRandom(random_parameter) => {
                 calculate_state_score(result, node, player) + agb::rng::gen() % random_parameter
-                    - random_parameter / 2
             }
             AIControl::Negative => -calculate_state_score(result, node, player),
         }
@@ -42,7 +41,6 @@ struct WithRandomCalculator {
 impl ScoreCalculator for WithRandomCalculator {
     fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
         calculate_state_score(result, node, player) + agb::rng::gen() % self.random_parameter
-            - self.random_parameter / 2
     }
 }
 
