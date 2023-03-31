@@ -527,7 +527,6 @@ impl<'controller> MyState<'controller> {
 
                     if input.is_just_pressed(Button::A) {
                         let slot = slot;
-                        agb::println!("Pressed A on card {}", slot);
                         self.select
                             .state_stack
                             .push(SelectState::BoardSelectPosition {
@@ -547,7 +546,6 @@ impl<'controller> MyState<'controller> {
                     self.select.object.hide();
                 }
                 if input.is_just_pressed(Button::L) {
-                    agb::println!("Pressed L");
                     self.select
                         .state_stack
                         .push(SelectState::BoardSelectPosition {
@@ -1100,8 +1098,6 @@ fn battle(gba: &mut agb::Gba) {
 
             loop {
                 mixer.frame();
-                let before_move_finder = get_vcount();
-                let work_to_do = state.move_finder.is_some();
 
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
@@ -1118,16 +1114,11 @@ fn battle(gba: &mut agb::Gba) {
                     }
                 }
                 expected_frame_counter = frame_counter.read() + 1;
-                let finish_clock = get_vcount();
 
                 vblank.wait_for_vblank();
                 text_render.commit();
                 object.commit();
                 input.update();
-
-                if work_to_do {
-                    agb::println!("Between {} and {}", before_move_finder, finish_clock);
-                }
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 

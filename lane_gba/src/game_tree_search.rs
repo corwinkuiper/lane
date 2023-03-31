@@ -54,8 +54,6 @@ impl ScoreCalculator for WorstCalculator {
 
 impl AIControl {
     pub fn move_finder(&self, state: State) -> Evaluator<Option<Move>> {
-        agb::println!("Creating move finder");
-
         Evaluator::new(find_best_move(state, *self, 1))
     }
 }
@@ -110,8 +108,6 @@ async fn find_best_move(
         .enumerate_possible_moves_async(yeild, async_evaluator::yeild)
         .await;
 
-    agb::println!("Starting eval of {} positions", possible_moves.len());
-
     async_evaluator::yeild().await;
 
     randomise_list(&mut possible_moves);
@@ -141,23 +137,9 @@ async fn find_best_move(
         alpha = best_score.max(alpha);
     }
 
-    if best_score < -100000 {
-        agb::println!("From this position, loss is inevitable");
-    }
-
-    if best_score > 100000 {
-        agb::println!("From this position, win is inevitable");
-    }
-
     async_evaluator::yeild().await;
 
-    let (desired_move, _, resultant_score) = best_move.unwrap();
-
-    agb::println!(
-        "Playing a move that is rated in the long term {} and currently {}",
-        best_score,
-        resultant_score
-    );
+    let (desired_move, _, _) = best_move.unwrap();
 
     Some(desired_move)
 }
@@ -210,12 +192,6 @@ async fn minimax(
                 break;
             }
         }
-        agb::println!(
-            "Searched my turn turn: d = {}, max = {}",
-            depth,
-            best_evaluation
-        );
-
         best_evaluation
     } else {
         let mut worst_evaluation = i32::MAX;
@@ -240,11 +216,6 @@ async fn minimax(
                 break;
             }
         }
-        agb::println!(
-            "Searched opponents turn: d= {}, min = {}",
-            depth,
-            worst_evaluation
-        );
         worst_evaluation
     }
 }
