@@ -67,8 +67,6 @@ fn calculate_state_score(result: &MoveResult, node: &State, current_turn: Player
     let opponent_score = result.score.player(alternate_turn) as i32;
     score -= opponent_score.pow(3);
 
-    score += node.player_hand(current_turn).len() as i32;
-
     score
 }
 
