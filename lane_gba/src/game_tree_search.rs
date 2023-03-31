@@ -17,9 +17,9 @@ pub enum AiControlType {
     Negative,
 }
 
-impl ScoreCalculator for AIControl {
+impl ScoreCalculator for AiControlType {
     fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
-        match self.ai_type {
+        match self {
             AiControlType::Best => calculate_state_score(result, node, player),
             AiControlType::WithRandom(random_parameter) => {
                 calculate_state_score(result, node, player) + agb::rng::gen() % random_parameter
@@ -35,7 +35,7 @@ trait ScoreCalculator: Sync {
 
 impl AIControl {
     pub fn move_finder(&self, state: State) -> Evaluator<Option<Move>> {
-        Evaluator::new(find_best_move(state, *self, self.depth, 1))
+        Evaluator::new(find_best_move(state, self.ai_type, self.depth, 1))
     }
 }
 
@@ -109,6 +109,7 @@ async fn find_best_move(
         let mut next_state = game_state.clone();
         let result = next_state.execute_move(&move_to_check);
         let resultant_score = score_function.score(&result, &next_state, player);
+        async_evaluator::yeild().await;
         let score = minimax(
             &score_function,
             next_state,
