@@ -973,14 +973,17 @@ const MENU_OPTIONS: &[&str] = &[
     "Hard",
     "Impossible",
     "Watch",
+    "Witness The Impossible",
     "Pass the Console",
 ];
+
+const MENU_X_START: u16 = 3;
 
 impl<'controller> Menu<'controller> {
     fn new(object: &'controller ObjectController, text: &mut TextRender) -> Self {
         text.write(
             &FONT_15,
-            (5_u16, 2_u16).into(),
+            (MENU_X_START, 2_u16).into(),
             format_args!("{}", MENU_OPTIONS.join("\n")),
         );
 
@@ -1007,9 +1010,12 @@ impl<'controller> Menu<'controller> {
 
         let y_pos = 2 * 8 + 16 * self.cursor.position as i32 + 3;
 
-        let x_pos = 5 * 8 + 9 * MENU_OPTIONS[self.cursor.position].len() as i32 + 8;
+        let x_pos =
+            MENU_X_START as i32 * 8 + 9 * MENU_OPTIONS[self.cursor.position].len() as i32 + 8;
 
-        self.cursor.object_left.set_position((3 * 8, y_pos).into());
+        self.cursor
+            .object_left
+            .set_position(((MENU_X_START as i32 - 2) * 8, y_pos).into());
         self.cursor.object_right.set_position((x_pos, y_pos).into());
 
         self.cursor.object_left.show();
@@ -1055,7 +1061,17 @@ impl<'controller> Menu<'controller> {
                         ai_type: AiControlType::WithRandom(40),
                     },
                 )),
-                5 => Some(ControlMode::TwoHuman),
+                5 => Some(ControlMode::TwoAI(
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                )),
+                6 => Some(ControlMode::TwoHuman),
                 _ => unreachable!(),
             }
         } else {
