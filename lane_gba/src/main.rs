@@ -26,7 +26,7 @@ use agb::{
 };
 use alloc::vec::Vec;
 use async_evaluator::Evaluator;
-use game_tree_search::{AIControl, ControlMode};
+use game_tree_search::{AIControl, AiControlType, ControlMode};
 use lane_logic::{
     card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove,
     PlaceCardMove, Player, Position, PushCardMove, State,
@@ -527,7 +527,6 @@ impl<'controller> MyState<'controller> {
 
                     if input.is_just_pressed(Button::A) {
                         let slot = slot;
-                        agb::println!("Pressed A on card {}", slot);
                         self.select
                             .state_stack
                             .push(SelectState::BoardSelectPosition {
@@ -547,7 +546,6 @@ impl<'controller> MyState<'controller> {
                     self.select.object.hide();
                 }
                 if input.is_just_pressed(Button::L) {
-                    agb::println!("Pressed L");
                     self.select
                         .state_stack
                         .push(SelectState::BoardSelectPosition {
@@ -969,13 +967,23 @@ struct Menu<'controller> {
     cursor: MenuCursor<'controller>,
 }
 
-const MENU_OPTIONS: &[&str] = &["Trivial", "Medium", "Hard", "Watch", "Pass the Console"];
+const MENU_OPTIONS: &[&str] = &[
+    "Trivial",
+    "Medium",
+    "Hard",
+    "Impossible",
+    "Watch",
+    "Witness The Impossible",
+    "Pass the Console",
+];
+
+const MENU_X_START: u16 = 3;
 
 impl<'controller> Menu<'controller> {
     fn new(object: &'controller ObjectController, text: &mut TextRender) -> Self {
         text.write(
             &FONT_15,
-            (5_u16, 2_u16).into(),
+            (MENU_X_START, 2_u16).into(),
             format_args!("{}", MENU_OPTIONS.join("\n")),
         );
 
@@ -1002,9 +1010,12 @@ impl<'controller> Menu<'controller> {
 
         let y_pos = 2 * 8 + 16 * self.cursor.position as i32 + 3;
 
-        let x_pos = 5 * 8 + 9 * MENU_OPTIONS[self.cursor.position].len() as i32 + 8;
+        let x_pos =
+            MENU_X_START as i32 * 8 + 9 * MENU_OPTIONS[self.cursor.position].len() as i32 + 8;
 
-        self.cursor.object_left.set_position((3 * 8, y_pos).into());
+        self.cursor
+            .object_left
+            .set_position(((MENU_X_START as i32 - 2) * 8, y_pos).into());
         self.cursor.object_right.set_position((x_pos, y_pos).into());
 
         self.cursor.object_left.show();
@@ -1012,14 +1023,55 @@ impl<'controller> Menu<'controller> {
 
         if input.is_just_pressed(Button::A) {
             match self.cursor.position {
-                0 => Some(ControlMode::AI(AIControl::Negative, Player::B)),
-                1 => Some(ControlMode::AI(AIControl::WithRandom(50), Player::B)),
-                2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
-                3 => Some(ControlMode::TwoAI(
-                    AIControl::WithRandom(4),
-                    AIControl::WithRandom(4),
+                0 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::Negative,
+                    },
+                    Player::B,
                 )),
-                4 => Some(ControlMode::TwoHuman),
+                1 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    Player::B,
+                )),
+                2 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::Best,
+                    },
+                    Player::B,
+                )),
+                3 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::Best,
+                    },
+                    Player::B,
+                )),
+                4 => Some(ControlMode::TwoAI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                )),
+                5 => Some(ControlMode::TwoAI(
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                )),
+                6 => Some(ControlMode::TwoHuman),
                 _ => unreachable!(),
             }
         } else {
@@ -1100,8 +1152,6 @@ fn battle(gba: &mut agb::Gba) {
 
             loop {
                 mixer.frame();
-                let before_move_finder = get_vcount();
-                let work_to_do = state.move_finder.is_some();
 
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
@@ -1119,16 +1169,10 @@ fn battle(gba: &mut agb::Gba) {
                 }
                 expected_frame_counter = frame_counter.read() + 1;
 
-                let finish_clock = get_vcount();
-
                 vblank.wait_for_vblank();
                 text_render.commit();
                 object.commit();
                 input.update();
-
-                if work_to_do {
-                    agb::println!("Between {} and {}", before_move_finder, finish_clock);
-                }
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
 

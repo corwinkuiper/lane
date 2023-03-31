@@ -10,6 +10,7 @@ edition = "2021"
 agb = { version = "0.13.0", features = ["testing"] }
 slotmap = { version = "1.0", default-features = false }
 lane_logic = { path = "../lane_logic" }
+async-recursion = "1.0.2"
 
 [profile.dev]
 opt-level = 2
