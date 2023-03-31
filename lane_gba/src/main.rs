@@ -26,7 +26,7 @@ use agb::{
 };
 use alloc::vec::Vec;
 use async_evaluator::Evaluator;
-use game_tree_search::{AIControl, ControlMode};
+use game_tree_search::{AIControl, AiControlType, ControlMode};
 use lane_logic::{
     card::CardType, Direction, HeldCard, HeldCardIndex, Index, Move, MoveResult, PickCardMove,
     PlaceCardMove, Player, Position, PushCardMove, State,
@@ -967,7 +967,14 @@ struct Menu<'controller> {
     cursor: MenuCursor<'controller>,
 }
 
-const MENU_OPTIONS: &[&str] = &["Trivial", "Medium", "Hard", "Watch", "Pass the Console"];
+const MENU_OPTIONS: &[&str] = &[
+    "Trivial",
+    "Medium",
+    "Hard",
+    "Impossible",
+    "Watch",
+    "Pass the Console",
+];
 
 impl<'controller> Menu<'controller> {
     fn new(object: &'controller ObjectController, text: &mut TextRender) -> Self {
@@ -1010,14 +1017,45 @@ impl<'controller> Menu<'controller> {
 
         if input.is_just_pressed(Button::A) {
             match self.cursor.position {
-                0 => Some(ControlMode::AI(AIControl::Negative, Player::B)),
-                1 => Some(ControlMode::AI(AIControl::WithRandom(40), Player::B)),
-                2 => Some(ControlMode::AI(AIControl::Best, Player::B)),
-                3 => Some(ControlMode::TwoAI(
-                    AIControl::WithRandom(40),
-                    AIControl::WithRandom(40),
+                0 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::Negative,
+                    },
+                    Player::B,
                 )),
-                4 => Some(ControlMode::TwoHuman),
+                1 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    Player::B,
+                )),
+                2 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::Best,
+                    },
+                    Player::B,
+                )),
+                3 => Some(ControlMode::AI(
+                    AIControl {
+                        depth: 2,
+                        ai_type: AiControlType::Best,
+                    },
+                    Player::B,
+                )),
+                4 => Some(ControlMode::TwoAI(
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                    AIControl {
+                        depth: 1,
+                        ai_type: AiControlType::WithRandom(40),
+                    },
+                )),
+                5 => Some(ControlMode::TwoHuman),
                 _ => unreachable!(),
             }
         } else {

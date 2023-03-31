@@ -5,7 +5,13 @@ use crate::async_evaluator::{self, Evaluator};
 use async_recursion::async_recursion;
 
 #[derive(Debug, Clone, Copy)]
-pub enum AIControl {
+pub struct AIControl {
+    pub depth: u32,
+    pub ai_type: AiControlType,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AiControlType {
     Best,
     WithRandom(i32),
     Negative,
@@ -13,12 +19,12 @@ pub enum AIControl {
 
 impl ScoreCalculator for AIControl {
     fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
-        match self {
-            AIControl::Best => calculate_state_score(result, node, player),
-            AIControl::WithRandom(random_parameter) => {
+        match self.ai_type {
+            AiControlType::Best => calculate_state_score(result, node, player),
+            AiControlType::WithRandom(random_parameter) => {
                 calculate_state_score(result, node, player) + agb::rng::gen() % random_parameter
             }
-            AIControl::Negative => -calculate_state_score(result, node, player),
+            AiControlType::Negative => -calculate_state_score(result, node, player),
         }
     }
 }
@@ -27,34 +33,9 @@ trait ScoreCalculator: Sync {
     fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32;
 }
 
-struct BestCalculator;
-
-impl ScoreCalculator for BestCalculator {
-    fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
-        calculate_state_score(result, node, player)
-    }
-}
-
-struct WithRandomCalculator {
-    random_parameter: i32,
-}
-impl ScoreCalculator for WithRandomCalculator {
-    fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
-        calculate_state_score(result, node, player) + agb::rng::gen() % self.random_parameter
-    }
-}
-
-struct WorstCalculator;
-
-impl ScoreCalculator for WorstCalculator {
-    fn score(&self, result: &MoveResult, node: &State, player: Player) -> i32 {
-        -calculate_state_score(result, node, player)
-    }
-}
-
 impl AIControl {
     pub fn move_finder(&self, state: State) -> Evaluator<Option<Move>> {
-        Evaluator::new(find_best_move(state, *self, 1))
+        Evaluator::new(find_best_move(state, *self, self.depth, 1))
     }
 }
 
@@ -102,6 +83,7 @@ fn randomise_list<T>(items: &mut Vec<T>) {
 async fn find_best_move(
     game_state: State,
     score_function: impl ScoreCalculator,
+    max_depth: u32,
     yeild: usize,
 ) -> Option<Move> {
     let mut possible_moves = game_state
@@ -127,7 +109,16 @@ async fn find_best_move(
         let mut next_state = game_state.clone();
         let result = next_state.execute_move(&move_to_check);
         let resultant_score = score_function.score(&result, &next_state, player);
-        let score = minimax(&score_function, next_state, &result, 1, player, alpha, beta).await;
+        let score = minimax(
+            &score_function,
+            next_state,
+            &result,
+            max_depth - 1,
+            player,
+            alpha,
+            beta,
+        )
+        .await;
 
         if score > best_score {
             best_move = Some((move_to_check, score, resultant_score));
@@ -144,8 +135,6 @@ async fn find_best_move(
     Some(desired_move)
 }
 
-const MAX_DEPTH: u32 = 2;
-
 #[async_recursion]
 async fn minimax(
     score_function: &impl ScoreCalculator,
@@ -156,7 +145,7 @@ async fn minimax(
     mut alpha: i32,
     mut beta: i32,
 ) -> i32 {
-    if depth >= MAX_DEPTH || move_result_to_get_here.winner.is_some() {
+    if depth == 0 || move_result_to_get_here.winner.is_some() {
         return score_function.score(move_result_to_get_here, &node, me);
     }
 
@@ -180,7 +169,7 @@ async fn minimax(
                 score_function,
                 next_node,
                 &next_move_result,
-                depth + 1,
+                depth - 1,
                 me,
                 alpha,
                 beta,
@@ -203,7 +192,7 @@ async fn minimax(
                 score_function,
                 next_node,
                 &next_move_result,
-                depth + 1,
+                depth - 1,
                 me,
                 alpha,
                 beta,
