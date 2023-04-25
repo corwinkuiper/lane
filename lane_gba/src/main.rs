@@ -1164,15 +1164,6 @@ fn battle(gba: &mut agb::Gba) {
                 let is_processing = state.move_finder.is_some();
                 let start_count = get_vcount();
 
-                if !is_processing {
-                    if processing_for_frames != 0 {
-                        agb::println!("Processed for {} frames", processing_for_frames);
-                    }
-                    processing_for_frames = 0;
-                } else {
-                    processing_for_frames += 1;
-                }
-
                 if FRAME_COUNTER.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
                         while get_vcount() >= 160 {
@@ -1201,12 +1192,21 @@ fn battle(gba: &mut agb::Gba) {
                 if is_processing {
                     let done_processing = state.move_finder.is_none();
 
-                    agb::println!(
-                        "Start: {}, end {}. Done: {}",
-                        start_count,
-                        end_count,
-                        done_processing
-                    );
+                    if done_processing {
+                        if processing_for_frames != 0 {
+                            agb::println!("Processed for {} frames", processing_for_frames);
+                        }
+                        processing_for_frames = 0;
+                    } else {
+                        processing_for_frames += 1;
+                    }
+
+                    // agb::println!(
+                    //     "Start: {}, end {}. Done: {}",
+                    //     start_count,
+                    //     end_count,
+                    //     done_processing
+                    // );
                 }
 
                 if input.is_just_pressed(Button::START) && state.winner.is_some() {
