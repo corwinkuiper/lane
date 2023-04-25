@@ -13,8 +13,8 @@ use agb::{
         font::TextRenderer,
         object::{Graphics, Object, ObjectController, Sprite, Tag},
         tiled::{
-            DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileSetting, TiledMap,
-            VRamManager,
+            DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileFormat, TileSetting,
+            TiledMap, VRamManager,
         },
         Font, Priority, HEIGHT, WIDTH,
     },
@@ -1089,7 +1089,11 @@ fn battle(gba: &mut agb::Gba) {
     let vram_cell = RefCell::new(vram);
 
     let mut text_render = TextRender::new(
-        gfx.background(Priority::P0, RegularBackgroundSize::Background32x32),
+        gfx.background(
+            Priority::P0,
+            RegularBackgroundSize::Background32x32,
+            TileFormat::FourBpp,
+        ),
         &vram_cell,
     );
 
@@ -1153,6 +1157,9 @@ fn battle(gba: &mut agb::Gba) {
             loop {
                 mixer.frame();
 
+                let is_processing = state.move_finder.is_some();
+                let start_count = get_vcount();
+
                 if frame_counter.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
                         while get_vcount() >= 160 {
@@ -1160,13 +1167,15 @@ fn battle(gba: &mut agb::Gba) {
                                 break;
                             }
                         }
-                        while get_vcount() < 100 {
+                        while get_vcount() < 160 {
                             if finder.do_work().is_some() {
                                 break;
                             }
                         }
                     }
                 }
+
+                let end_count = get_vcount();
                 expected_frame_counter = frame_counter.read() + 1;
 
                 vblank.wait_for_vblank();
@@ -1175,6 +1184,17 @@ fn battle(gba: &mut agb::Gba) {
                 input.update();
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
+
+                if is_processing {
+                    let done_processing = state.move_finder.is_none();
+
+                    agb::println!(
+                        "Start: {}, end {}. Done: {}",
+                        start_count,
+                        end_count,
+                        done_processing
+                    );
+                }
 
                 if input.is_just_pressed(Button::START) && state.winner.is_some() {
                     break;

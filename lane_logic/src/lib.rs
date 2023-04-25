@@ -348,27 +348,12 @@ impl State {
         moves
     }
 
-    pub async fn enumerate_possible_moves_async<F, Fut>(
-        &self,
-        yeild_every: usize,
-        yeild: F,
-    ) -> Vec<Move>
+    pub async fn enumerate_possible_moves_async<F, Fut>(&self, yeild: F) -> Vec<Move>
     where
         F: Fn() -> Fut,
         Fut: Future<Output = ()>,
     {
         let mut moves = Vec::new();
-
-        let mut counter = 0;
-        let mut should_yeild = || {
-            counter += 1;
-            if counter > yeild_every {
-                counter = 0;
-                true
-            } else {
-                false
-            }
-        };
 
         // create list of positions that is valid to place
         let mut possible = Vec::new();
@@ -378,10 +363,8 @@ impl State {
                 let desired_spot = card.position + direction;
                 if self.board.no_cards_in_direction(card.position, direction) {
                     possible.push((desired_spot, -direction));
-                    if should_yeild() {
-                        yeild().await;
-                    }
                 }
+                yeild().await;
             }
         }
 
@@ -394,12 +377,11 @@ impl State {
                         coordinate: position,
                         card: HeldCardIndex(idx),
                     }));
-                    if should_yeild() {
-                        yeild().await;
-                    }
+                    yeild().await;
                 }
             }
         }
+        yeild().await;
 
         // all possible pushing moves
         for (idx, card) in self.board.positions.iter() {
@@ -407,9 +389,7 @@ impl State {
                 continue;
             }
 
-            if should_yeild() {
-                yeild().await;
-            }
+            yeild().await;
 
             moves.push(Move::PickCard(PickCardMove { card: Index(idx) }));
 
@@ -421,6 +401,7 @@ impl State {
                 if self.can_execute_move(&m) {
                     moves.push(m);
                 }
+                yeild().await;
             }
         }
 
