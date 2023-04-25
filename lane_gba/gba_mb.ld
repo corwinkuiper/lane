@@ -72,7 +72,11 @@ SECTIONS {
     __ewram_rom_length_bytes = __ewram_data_end - __ewram_data_start;
     __ewram_rom_length_halfwords = (__ewram_rom_length_bytes + 1) / 2;
 
-        /* debugging sections */
+    .shstrtab : {
+       *(.shstrtab)
+    }
+
+    /* debugging sections */
     /* Stabs */
     .stab            0 : { *(.stab) }
     .stabstr         0 : { *(.stabstr) }

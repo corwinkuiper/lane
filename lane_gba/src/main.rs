@@ -6,7 +6,7 @@
 #![feature(drain_filter)]
 #![feature(allocator_api)]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, f32::consts::E};
 
 use agb::{
     display::{
@@ -1143,12 +1143,16 @@ fn battle(gba: &mut agb::Gba) {
             }
         };
 
-        let frame_counter = agb::sync::Static::new(0);
-        let mut expected_frame_counter = frame_counter.read();
+        static FRAME_COUNTER: agb::sync::Static<i32> = agb::sync::Static::new(0);
+        let mut expected_frame_counter = FRAME_COUNTER.read();
 
-        let _v_frame_count = agb::interrupt::add_interrupt_handler(Interrupt::VBlank, |_cs| {
-            frame_counter.write(frame_counter.read() + 1);
-        });
+        let _v_frame_count = unsafe {
+            agb::interrupt::add_interrupt_handler(Interrupt::VBlank, |_cs| {
+                FRAME_COUNTER.write(FRAME_COUNTER.read() + 1);
+            })
+        };
+
+        let mut processing_for_frames = 0;
 
         text_render.clear();
         {
@@ -1160,7 +1164,16 @@ fn battle(gba: &mut agb::Gba) {
                 let is_processing = state.move_finder.is_some();
                 let start_count = get_vcount();
 
-                if frame_counter.read() == expected_frame_counter {
+                if !is_processing {
+                    if processing_for_frames != 0 {
+                        agb::println!("Processed for {} frames", processing_for_frames);
+                    }
+                    processing_for_frames = 0;
+                } else {
+                    processing_for_frames += 1;
+                }
+
+                if FRAME_COUNTER.read() == expected_frame_counter {
                     if let Some(finder) = &mut state.move_finder {
                         while get_vcount() >= 160 {
                             if finder.do_work().is_some() {
@@ -1176,7 +1189,7 @@ fn battle(gba: &mut agb::Gba) {
                 }
 
                 let end_count = get_vcount();
-                expected_frame_counter = frame_counter.read() + 1;
+                expected_frame_counter = FRAME_COUNTER.read() + 1;
 
                 vblank.wait_for_vblank();
                 text_render.commit();

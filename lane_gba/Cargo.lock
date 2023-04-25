@@ -16,66 +16,74 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "agb"
-version = "0.13.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57630006e03e708495e0f65eb0417be52b845efd81649af6a70da4ff39e8fbbf"
+checksum = "c1fc27f0a35fa9b7907346b1e2521c95261ab71cef0006d7aca241d9baf9ae7a"
 dependencies = [
  "agb_fixnum",
+ "agb_hashmap",
  "agb_image_converter",
  "agb_macros",
  "agb_sound_converter",
  "bare-metal",
- "bitflags",
+ "bitflags 2.1.0",
  "modular-bitfield",
  "rustc-hash",
 ]
 
 [[package]]
 name = "agb_fixnum"
-version = "0.13.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dbb17883387eac6189bcce811cdd36d889656670d2172dd44b43c97b524bf32"
+checksum = "4b7e8f9bf72520ed7c57aa2c234db81220f7fbbcd00328af98d16fe4e25b55dc"
 dependencies = [
  "agb_macros",
 ]
 
 [[package]]
-name = "agb_image_converter"
-version = "0.13.0"
+name = "agb_hashmap"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a355c6da0cb6fb5c37639736723b0f1984ccd3a60c6c98380339466466dc10e"
+checksum = "8b191a472f8cbd7585204ebf57ec45f51b4bc8a999cc95f1d1d7a8ee890fb334"
+dependencies = [
+ "rustc-hash",
+]
+
+[[package]]
+name = "agb_image_converter"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cf1fa6ce790e344049ddf2bb4de4c10e983dbaa8e1bba4680e1391c24f22339"
 dependencies = [
  "asefile",
  "fontdue",
  "image",
  "proc-macro2",
  "quote",
- "serde",
- "syn",
- "toml",
+ "syn 2.0.13",
 ]
 
 [[package]]
 name = "agb_macros"
-version = "0.13.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "249e3d3050dedc5a7e958fe2d92d75a0448942c99ba20651977de213e91967f6"
+checksum = "27950c0058d4396bdfad6935ae6cb21e04ddeb4622ae330039d18a85793209e7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.13",
 ]
 
 [[package]]
 name = "agb_sound_converter"
-version = "0.13.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa5de27af08f534021984469a0d4004f1f0fdc6af6f0f42223b05bfa0e32fa44"
+checksum = "a14a44017c9d6ebffe64bf670d528ab65ff9284afdcc164cece3d7f6078f365f"
 dependencies = [
  "hound",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.13",
 ]
 
 [[package]]
@@ -95,7 +103,7 @@ version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10a71de7aecd2d0a76ec90fde2c443d12667c737d92de76bd187f101eca37891"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "byteorder",
  "flate2",
  "image",
@@ -111,7 +119,7 @@ checksum = "3b015a331cc64ebd1774ba119538573603427eaace0a1950c423ab971f903796"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.102",
 ]
 
 [[package]]
@@ -131,6 +139,12 @@ name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
+
+[[package]]
+name = "bitflags"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c70beb79cbb5ce9c4f8e20849978f34225931f665bb49efa6982875a4d5facb3"
 
 [[package]]
 name = "bytemuck"
@@ -191,7 +205,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a62391ecb864cf12ed06b2af4eda2e609b97657950d6a8f06841b17726ab253"
 dependencies = [
- "hashbrown 0.11.2",
+ "hashbrown",
  "ttf-parser",
 ]
 
@@ -214,12 +228,6 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
  "ahash",
 ]
-
-[[package]]
-name = "hashbrown"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 
 [[package]]
 name = "hound"
@@ -257,7 +265,7 @@ name = "lane_logic"
 version = "0.1.0"
 dependencies = [
  "agb_fixnum",
- "hashbrown 0.13.2",
+ "agb_hashmap",
  "slotmap",
 ]
 
@@ -312,7 +320,7 @@ checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.102",
 ]
 
 [[package]]
@@ -374,7 +382,7 @@ version = "0.16.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c3287920cb847dee3de33d301c463fba14dda99db24214ddf93f83d3021f4c6"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "crc32fast",
  "deflate",
  "miniz_oxide 0.3.7",
@@ -382,18 +390,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.47"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
+checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.21"
+version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
+checksum = "4424af4bf778aae2051a77b60283332f386554255d722233d09fbfc7e30da2fc"
 dependencies = [
  "proc-macro2",
 ]
@@ -403,26 +411,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "serde"
-version = "1.0.145"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "728eb6351430bccb993660dfffc5a72f91ccc1295abaa8ce19b27ebe4f75568b"
-dependencies = [
- "serde_derive",
-]
-
-[[package]]
-name = "serde_derive"
-version = "1.0.145"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81fa1584d3d1bcacd84c277a0dfe21f5b0f6accf4a23d04d4c6d61f1af522b4c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "slotmap"
@@ -451,12 +439,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml"
-version = "0.5.9"
+name = "syn"
+version = "2.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
+checksum = "4c9da457c5285ac1f936ebd076af6dac17a61cfe7826f2076b4d015cf47bc8ec"
 dependencies = [
- "serde",
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
 ]
 
 [[package]]
