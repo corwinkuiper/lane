@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 agb_fixnum = { version = "0.15" }
-hashbrown = { version = "0.13", default-features = false }
+agb_hashmap = { version = "0.15" }
 slotmap = { version = "1", default-features = false }

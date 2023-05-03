@@ -1,12 +1,12 @@
 #![no_std]
 #![warn(clippy::all)]
-use core::ops::Add;
+use core::ops::{Add, Deref, DerefMut};
 use core::{future::Future, hash::Hash, ops::Neg};
 
 use agb_fixnum::Vector2D;
 
+use agb_hashmap::{HashMap, IterOwned};
 use alloc::vec::Vec;
-use hashbrown::HashMap;
 use slotmap::HopSlotMap;
 mod rustc_hash;
 
@@ -412,7 +412,48 @@ impl State {
 #[derive(Debug, Clone)]
 struct Board {
     positions: HopSlotMap<slotmap::DefaultKey, PlacedCard>,
-    position_cache: HashMap<Position, Index, rustc_hash::FxBuildHasher>,
+    position_cache: PositionCache,
+}
+
+struct PositionCache(HashMap<Position, Index>);
+
+impl PositionCache {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl Clone for PositionCache {
+    fn clone(&self) -> Self {
+        let mut new = HashMap::with_capacity(self.0.capacity());
+        for (key, value) in self.iter() {
+            new.insert(*key, *value);
+        }
+
+        Self(new)
+    }
+}
+
+impl core::fmt::Debug for PositionCache {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_map()
+            .entries(self.iter().map(|(k, v)| (k, v)))
+            .finish()
+    }
+}
+
+impl Deref for PositionCache {
+    type Target = HashMap<Position, Index>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PositionCache {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -439,7 +480,7 @@ impl Board {
             card: CardType::Score.to_data(),
         });
 
-        let mut map = HashMap::with_hasher(rustc_hash::FxBuildHasher);
+        let mut map = PositionCache::new();
 
         map.insert(Position((0, 0).into()), Index(k1));
         map.insert(Position((1, 0).into()), Index(k2));
@@ -669,4 +710,84 @@ impl Score {
     }
 }
 
-type Set<I> = alloc::collections::BTreeSet<I>;
+struct HashSet<I>(HashMap<I, ()>);
+
+impl<I> HashSet<I> {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+    fn with_capacity(capacity: usize) -> Self {
+        Self(HashMap::with_capacity(capacity))
+    }
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &I> {
+        self.0.iter().map(|x| x.0)
+    }
+}
+
+impl<I> HashSet<I>
+where
+    I: Hash + Eq,
+{
+    fn insert(&mut self, item: I) {
+        self.0.insert(item, ());
+    }
+
+    fn contains(&self, value: &I) -> bool {
+        self.0.get(value).is_some()
+    }
+
+    fn union<'a>(&'a self, other: &'a HashSet<I>) -> impl Iterator<Item = &I> + 'a {
+        if self.len() >= other.len() {
+            self.iter().chain(other.difference(self))
+        } else {
+            other.iter().chain(self.difference(other))
+        }
+    }
+
+    fn difference<'a>(&'a self, other: &'a HashSet<I>) -> impl Iterator<Item = &I> + 'a {
+        self.iter().filter(|x| !other.contains(x))
+    }
+}
+
+struct HashSetIter<I>(IterOwned<I, ()>);
+
+impl<I> Iterator for HashSetIter<I> {
+    type Item = I;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|x| x.0)
+    }
+}
+
+impl<I> IntoIterator for HashSet<I> {
+    type Item = I;
+
+    type IntoIter = HashSetIter<I>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        HashSetIter(self.0.into_iter())
+    }
+}
+
+impl<I: Hash + Eq> FromIterator<I> for HashSet<I> {
+    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let mut set = HashSet::with_capacity(iter.size_hint().0);
+
+        for item in iter {
+            set.insert(item);
+        }
+
+        set
+    }
+}
+
+type Set<I> = HashSet<I>;
