@@ -14,18 +14,25 @@ impl Card for Redirect {
         let my_position = board[self_index].position;
         let mut moved_cards = Set::new();
 
-        let push_directions = [direction.anticlockwise(), direction.clockwise(), direction];
+        let push_directions = [direction, direction.anticlockwise(), direction.clockwise()];
 
         for push_direction in push_directions.into_iter() {
             let push_position = my_position + push_direction;
             if let Some(next_index) = board.get_card_position(push_position) {
                 let moved = CardData::push(board, next_index, push_direction);
+
+                if push_direction == direction && moved.is_empty() {
+                    return moved;
+                }
+
                 moved_cards = moved_cards.union(&moved).copied().collect();
             }
         }
 
-        moved_cards.insert(self_index);
-        board.move_card(board[self_index].position, my_position + direction);
+        if board[self_index].position == my_position {
+            moved_cards.insert(self_index);
+            board.move_card(self_index, my_position + direction);
+        }
 
         moved_cards
     }

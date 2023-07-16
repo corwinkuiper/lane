@@ -24,7 +24,9 @@ impl Card for Normal {
         };
 
         moved.insert(self_index);
-        board.move_card(board[self_index].position, next_position);
+        if board[self_index].position == my_position {
+            board.move_card(self_index, next_position);
+        }
 
         moved
     }
