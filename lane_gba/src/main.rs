@@ -3,8 +3,8 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, reexport_test_harness_main = "test_main")]
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
-#![feature(drain_filter)]
 #![feature(allocator_api)]
+#![feature(extract_if)]
 
 use core::cell::RefCell;
 
@@ -78,6 +78,7 @@ fn card_type_to_sprite(t: CardType) -> &'static Sprite {
         CardType::Double => deconstify!(CARDS.tags().get("Double")).sprite(0),
         CardType::Ghost => deconstify!(CARDS.tags().get("Ghost")).sprite(0),
         CardType::Score => deconstify!(CARDS.tags().get("Score")).sprite(0),
+        CardType::Redirect => deconstify!(CARDS.tags().get("Redirect")).sprite(0),
     }
 }
 
@@ -94,6 +95,7 @@ fn card_type_to_sprite_double(t: CardType) -> &'static Sprite {
         CardType::Double => deconstify!(CARDS.tags().get("Double Double")).sprite(0),
         CardType::Ghost => deconstify!(CARDS.tags().get("Ghost Double")).sprite(0),
         CardType::Score => deconstify!(CARDS.tags().get("Score Double")).sprite(0),
+        CardType::Redirect => deconstify!(CARDS.tags().get("Redirect Double")).sprite(0),
     }
 }
 
@@ -798,7 +800,7 @@ impl<'controller> MyState<'controller> {
         let cards = &self.cards;
 
         for (idx, animation) in playing_animations
-            .drain_filter(|(idx, animation)| match animation {
+            .extract_if(|(idx, animation)| match animation {
                 CardAnimationStatus::Placed(pos) | CardAnimationStatus::MoveTowards(pos) => {
                     (cards[idx.to_slotmap_key()].position - *pos).manhattan_distance() < 1.into()
                 }
@@ -1113,14 +1115,16 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Block),
-            HeldCard::Avaliable(CardType::Ghost)
+            HeldCard::Avaliable(CardType::Ghost),
+            HeldCard::Avaliable(CardType::Redirect)
         ],
         alloc::vec![
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Block),
-            HeldCard::Avaliable(CardType::Ghost)
+            HeldCard::Avaliable(CardType::Ghost),
+            HeldCard::Avaliable(CardType::Redirect)
         ],
         Player::A,
     );

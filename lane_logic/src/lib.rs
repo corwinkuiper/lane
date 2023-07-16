@@ -44,6 +44,14 @@ const DIRECTIONS: [Direction; 4] = [
 ];
 
 impl Direction {
+    pub fn clockwise(self) -> Self {
+        DIRECTIONS[(self as usize + 1) % DIRECTIONS.len()]
+    }
+
+    pub fn anticlockwise(self) -> Self {
+        DIRECTIONS[(self as i32 - 1).rem_euclid(DIRECTIONS.len() as i32) as usize]
+    }
+
     pub fn to_unit_vector(self) -> Vector2D<i32> {
         match self {
             Direction::North => (0, -1),
