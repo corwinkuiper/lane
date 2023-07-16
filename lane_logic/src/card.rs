@@ -129,6 +129,7 @@ pub mod double;
 pub mod ghost;
 pub mod normal;
 pub mod redirect;
+pub mod reverse;
 pub mod score;
 
 use block::Block;
@@ -136,7 +137,8 @@ use double::Double;
 use ghost::Ghost;
 use normal::Normal;
 use redirect::Redirect;
+use reverse::Reverse;
 use score::Score;
 
 // DO NOT PUT ANYTHING WITH INTERIOR MUTABILITY IN HERE
-create_card_data!(CardData, CardType, Block, Normal, Double, Ghost, Score, Redirect);
+create_card_data!(CardData, CardType, Block, Normal, Double, Ghost, Score, Redirect, Reverse);

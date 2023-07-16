@@ -420,7 +420,6 @@ impl State {
 #[derive(Debug, Clone)]
 struct Board {
     positions: HopSlotMap<slotmap::DefaultKey, PlacedCard>,
-    position_cache: PositionCache,
 }
 
 struct PositionCache(HashMap<Position, Index>);
@@ -492,10 +491,7 @@ impl Board {
 
         map.insert(Position((0, 0).into()), Index(k1));
         map.insert(Position((1, 0).into()), Index(k2));
-        Self {
-            positions: pos,
-            position_cache: map,
-        }
+        Self { positions: pos }
     }
 
     fn score(&self) -> [usize; 2] {
@@ -564,21 +560,18 @@ impl Board {
     }
 
     fn get_card_position(&self, position: Position) -> Option<Index> {
-        self.position_cache.get(&position).copied()
+        self.positions
+            .iter()
+            .find(|x| x.1.position == position)
+            .map(|x| Index(x.0))
     }
 
-    fn move_card(&mut self, current_position: Position, next_position: Position) {
-        let old = self
-            .position_cache
-            .remove(&current_position)
-            .expect("the given position should exist");
-        self[old].position = next_position;
-        self.position_cache.insert(next_position, old);
+    fn move_card(&mut self, card: Index, next_position: Position) {
+        self[card].position = next_position;
     }
 
     fn remove_card(&mut self, idx: Index) -> PlacedCard {
         let card = self.positions.remove(idx.0).unwrap();
-        self.position_cache.remove(&card.position);
         card
     }
 
@@ -588,7 +581,6 @@ impl Board {
             position,
             card,
         });
-        self.position_cache.insert(position, Index(idx));
         Index(idx)
     }
 

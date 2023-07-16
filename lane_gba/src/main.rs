@@ -79,6 +79,7 @@ fn card_type_to_sprite(t: CardType) -> &'static Sprite {
         CardType::Ghost => deconstify!(CARDS.tags().get("Ghost")).sprite(0),
         CardType::Score => deconstify!(CARDS.tags().get("Score")).sprite(0),
         CardType::Redirect => deconstify!(CARDS.tags().get("Redirect")).sprite(0),
+        CardType::Reverse => deconstify!(CARDS.tags().get("Reverse")).sprite(0),
     }
 }
 
@@ -96,6 +97,7 @@ fn card_type_to_sprite_double(t: CardType) -> &'static Sprite {
         CardType::Ghost => deconstify!(CARDS.tags().get("Ghost Double")).sprite(0),
         CardType::Score => deconstify!(CARDS.tags().get("Score Double")).sprite(0),
         CardType::Redirect => deconstify!(CARDS.tags().get("Redirect Double")).sprite(0),
+        CardType::Reverse => deconstify!(CARDS.tags().get("Reverse Double")).sprite(0),
     }
 }
 
@@ -1114,17 +1116,17 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Block),
+            HeldCard::Avaliable(CardType::Redirect),
             HeldCard::Avaliable(CardType::Ghost),
-            HeldCard::Avaliable(CardType::Redirect)
+            HeldCard::Avaliable(CardType::Reverse)
         ],
         alloc::vec![
             HeldCard::Avaliable(CardType::Double),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Block),
+            HeldCard::Avaliable(CardType::Redirect),
             HeldCard::Avaliable(CardType::Ghost),
-            HeldCard::Avaliable(CardType::Redirect)
+            HeldCard::Avaliable(CardType::Reverse)
         ],
         Player::A,
     );
