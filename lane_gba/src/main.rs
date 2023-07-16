@@ -6,7 +6,7 @@
 #![feature(drain_filter)]
 #![feature(allocator_api)]
 
-use core::{cell::RefCell, f32::consts::E};
+use core::cell::RefCell;
 
 use agb::{
     display::{
@@ -229,8 +229,8 @@ impl<'controller> MyState<'controller> {
                         cached_position: position,
                     };
 
-                    held.card_object.set_position(position);
-                    held.colour_object.set_position(position);
+                    held.card_object.show().set_position(position);
+                    held.colour_object.show().set_position(position);
                     held.colour_object.set_z(1);
                     self.hand.push(held);
                 }
@@ -244,9 +244,9 @@ impl<'controller> MyState<'controller> {
                         cached_position: position,
                     };
 
-                    held.card_object.set_position(position);
-                    held.colour_object.set_position(position);
-                    held.colour_object.set_z(1);
+                    held.card_object.show().set_position(position);
+                    held.colour_object.show().set_position(position);
+                    held.colour_object.show().set_z(1);
                     self.hand.push(held);
                 }
             }
