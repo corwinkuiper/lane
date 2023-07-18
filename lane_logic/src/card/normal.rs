@@ -6,13 +6,22 @@ use super::{Card, CardData};
 pub struct Normal {}
 
 impl Card for Normal {
-    fn push(board: &mut Board, self_index: Index, direction: Direction) -> Set<Index> {
+    fn push(
+        board: &mut Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> Set<Index> {
         let my_position = board[self_index].position;
         let next_position = my_position + direction;
 
+        if depth > board.number_of_cards() {
+            return Set::new();
+        }
+
         // find index of next item
         let mut moved = if let Some(next_index) = board.get_card_position(next_position) {
-            let moved = CardData::push(board, next_index, direction);
+            let moved = CardData::push(board, next_index, direction, depth + 1);
 
             if moved.is_empty() {
                 return moved;
@@ -31,13 +40,22 @@ impl Card for Normal {
         moved
     }
 
-    fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
+    fn can_push(
+        board: &Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> PushStatus {
         let my_position = board[self_index].position;
         let next_position = my_position + direction;
 
+        if depth > board.number_of_cards() {
+            return PushStatus::Fail;
+        }
+
         // find index of next item
         if let Some(next_index) = board.get_card_position(next_position) {
-            match CardData::can_push(board, next_index, direction) {
+            match CardData::can_push(board, next_index, direction, depth) {
                 PushStatus::Success(n) => PushStatus::Success(n + 1),
                 PushStatus::Fail => PushStatus::Fail,
             }
@@ -79,7 +97,7 @@ pub(crate) fn normal_placement(
     card_data: CardData,
 ) -> (Index, Set<Index>) {
     let idx = board.add_card(player, position, card_data);
-    (idx, CardData::push(board, idx, direction))
+    (idx, CardData::push(board, idx, direction, 0))
 }
 
 pub(crate) fn normal_placement_rule(

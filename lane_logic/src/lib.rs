@@ -1,6 +1,6 @@
 #![no_std]
 #![warn(clippy::all)]
-use core::ops::{Add, Deref, DerefMut};
+use core::ops::Add;
 use core::{future::Future, hash::Hash, ops::Neg};
 
 use agb_fixnum::Vector2D;
@@ -422,47 +422,6 @@ struct Board {
     positions: HopSlotMap<slotmap::DefaultKey, PlacedCard>,
 }
 
-struct PositionCache(HashMap<Position, Index>);
-
-impl PositionCache {
-    fn new() -> Self {
-        Self(HashMap::new())
-    }
-}
-
-impl Clone for PositionCache {
-    fn clone(&self) -> Self {
-        let mut new = HashMap::with_capacity(self.0.capacity());
-        for (key, value) in self.iter() {
-            new.insert(*key, *value);
-        }
-
-        Self(new)
-    }
-}
-
-impl core::fmt::Debug for PositionCache {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_map()
-            .entries(self.iter().map(|(k, v)| (k, v)))
-            .finish()
-    }
-}
-
-impl Deref for PositionCache {
-    type Target = HashMap<Position, Index>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for PositionCache {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Index(slotmap::DefaultKey);
 
@@ -476,21 +435,17 @@ impl Board {
     fn new() -> Self {
         let mut pos = HopSlotMap::new();
 
-        let k1 = pos.insert(PlacedCard {
+        pos.insert(PlacedCard {
             belonging_player: None,
             position: Position((0, 0).into()),
             card: CardType::Score.to_data(),
         });
-        let k2 = pos.insert(PlacedCard {
+        pos.insert(PlacedCard {
             belonging_player: None,
             position: Position((1, 0).into()),
             card: CardType::Score.to_data(),
         });
 
-        let mut map = PositionCache::new();
-
-        map.insert(Position((0, 0).into()), Index(k1));
-        map.insert(Position((1, 0).into()), Index(k2));
         Self { positions: pos }
     }
 
@@ -528,7 +483,11 @@ impl Board {
     }
 
     fn start_push(&mut self, idx: Index, direction: Direction) -> Set<Index> {
-        CardData::push(self, idx, direction)
+        CardData::push(self, idx, direction, 0)
+    }
+
+    fn number_of_cards(&self) -> usize {
+        self.positions.len()
     }
 
     fn start_place(
@@ -542,7 +501,7 @@ impl Board {
     }
 
     fn can_push(&self, idx: Index, direction: Direction) -> PushStatus {
-        CardData::can_push(self, idx, direction)
+        CardData::can_push(self, idx, direction, 0)
     }
 
     fn can_place(

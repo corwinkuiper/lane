@@ -14,8 +14,6 @@ MEMORY {
 
 __text_start = ORIGIN(ewram);
 
-INPUT (agb.a)
-
 SECTIONS {
     . = __text_start;
 
@@ -76,7 +74,7 @@ SECTIONS {
        *(.shstrtab)
     }
 
-    /* debugging sections */
+        /* debugging sections */
     /* Stabs */
     .stab            0 : { *(.stab) }
     .stabstr         0 : { *(.stabstr) }

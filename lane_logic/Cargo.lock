@@ -4,27 +4,27 @@ version = 3
 
 [[package]]
 name = "agb_fixnum"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7e8f9bf72520ed7c57aa2c234db81220f7fbbcd00328af98d16fe4e25b55dc"
+checksum = "01bece8a97318b45b1aea0ba3605486ec61b234fabc428cc3f94bcd74c9d4f9b"
 dependencies = [
  "agb_macros",
 ]
 
 [[package]]
 name = "agb_hashmap"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b191a472f8cbd7585204ebf57ec45f51b4bc8a999cc95f1d1d7a8ee890fb334"
+checksum = "aa8e34f934d8d788a8ef5ca77a6328f0ae25bb8061813339c3f39e4855d2c524"
 dependencies = [
  "rustc-hash",
 ]
 
 [[package]]
 name = "agb_macros"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27950c0058d4396bdfad6935ae6cb21e04ddeb4622ae330039d18a85793209e7"
+checksum = "9b6abf418099c5e70b4b105035eb6819e51822a9685d489082aec75e698b41c9"
 dependencies = [
  "proc-macro2",
  "quote",

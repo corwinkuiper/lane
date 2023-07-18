@@ -10,6 +10,7 @@ impl Card for Redirect {
         board: &mut crate::Board,
         self_index: crate::Index,
         direction: crate::Direction,
+        depth: usize,
     ) -> crate::Set<crate::Index> {
         let my_position = board[self_index].position;
         let mut moved_cards = Set::new();
@@ -19,7 +20,7 @@ impl Card for Redirect {
         for push_direction in push_directions.into_iter() {
             let push_position = my_position + push_direction;
             if let Some(next_index) = board.get_card_position(push_position) {
-                let moved = CardData::push(board, next_index, push_direction);
+                let moved = CardData::push(board, next_index, push_direction, depth);
 
                 if push_direction == direction && moved.is_empty() {
                     return moved;
@@ -41,8 +42,9 @@ impl Card for Redirect {
         board: &crate::Board,
         self_index: crate::Index,
         direction: crate::Direction,
+        depth: usize,
     ) -> crate::PushStatus {
-        Normal::can_push(board, self_index, direction)
+        Normal::can_push(board, self_index, direction, depth)
     }
 
     fn can_place(

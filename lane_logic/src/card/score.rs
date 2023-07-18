@@ -6,12 +6,22 @@ use super::{normal::Normal, Card};
 pub struct Score {}
 
 impl Card for Score {
-    fn push(board: &mut Board, self_index: Index, direction: Direction) -> Set<Index> {
-        Normal::push(board, self_index, direction)
+    fn push(
+        board: &mut Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> Set<Index> {
+        Normal::push(board, self_index, direction, depth)
     }
 
-    fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        Normal::can_push(board, self_index, direction)
+    fn can_push(
+        board: &Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> PushStatus {
+        Normal::can_push(board, self_index, direction, depth)
     }
 
     fn can_place(

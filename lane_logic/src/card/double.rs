@@ -6,20 +6,30 @@ use super::{normal::Normal, Card, CardData};
 pub struct Double {}
 
 impl Card for Double {
-    fn push(board: &mut Board, self_index: Index, direction: Direction) -> Set<Index> {
-        let pushed = Normal::push(board, self_index, direction);
+    fn push(
+        board: &mut Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> Set<Index> {
+        let pushed = Normal::push(board, self_index, direction, depth);
         if pushed.is_empty() {
             return pushed;
         }
 
-        Normal::push(board, self_index, direction)
+        Normal::push(board, self_index, direction, depth)
             .union(&pushed)
             .cloned()
             .collect()
     }
 
-    fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus {
-        match Normal::can_push(board, self_index, direction) {
+    fn can_push(
+        board: &Board,
+        self_index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> PushStatus {
+        match Normal::can_push(board, self_index, direction, depth) {
             PushStatus::Success(n @ 1..) => PushStatus::Success(n),
             PushStatus::Success(0) | PushStatus::Fail => {
                 // check if our double push can push
@@ -29,7 +39,7 @@ impl Card for Double {
 
                 // find index of next item
                 if let Some(next_index) = board.get_card_position(next_position) {
-                    match CardData::can_push(board, next_index, direction) {
+                    match CardData::can_push(board, next_index, direction, depth) {
                         PushStatus::Success(n) => PushStatus::Success(n + 1),
                         PushStatus::Fail => PushStatus::Success(0),
                     }

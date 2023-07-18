@@ -5,8 +5,6 @@ use core::{
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-use agb::InternalAllocator;
-
 use alloc::boxed::Box;
 
 enum Either<L, R> {
@@ -16,7 +14,7 @@ enum Either<L, R> {
 
 struct Executor<O> {
     waker: Waker,
-    fut: Pin<Box<dyn Future<Output = O>, InternalAllocator>>,
+    fut: Pin<Box<dyn Future<Output = O>>>,
 }
 
 pub struct Evaluator<O> {
@@ -33,7 +31,7 @@ impl<O> Evaluator<O> {
 
         Self {
             data: Either::Left(Executor {
-                fut: Box::pin_in(future, InternalAllocator),
+                fut: Box::pin(future),
                 waker,
             }),
         }

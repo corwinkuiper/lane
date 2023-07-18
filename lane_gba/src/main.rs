@@ -1117,7 +1117,6 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Redirect),
-            HeldCard::Avaliable(CardType::Ghost),
             HeldCard::Avaliable(CardType::Reverse)
         ],
         alloc::vec![
@@ -1125,7 +1124,6 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Redirect),
-            HeldCard::Avaliable(CardType::Ghost),
             HeldCard::Avaliable(CardType::Reverse)
         ],
         Player::A,
@@ -1149,17 +1147,6 @@ fn battle(gba: &mut agb::Gba) {
             }
         };
 
-        static FRAME_COUNTER: agb::sync::Static<i32> = agb::sync::Static::new(0);
-        let mut expected_frame_counter = FRAME_COUNTER.read();
-
-        let _v_frame_count = unsafe {
-            agb::interrupt::add_interrupt_handler(Interrupt::VBlank, |_cs| {
-                FRAME_COUNTER.write(FRAME_COUNTER.read() + 1);
-            })
-        };
-
-        let mut processing_for_frames = 0;
-
         text_render.clear();
         {
             let mut state = MyState::new(game_state.clone(), &object, mode);
@@ -1167,26 +1154,18 @@ fn battle(gba: &mut agb::Gba) {
             loop {
                 mixer.frame();
 
-                let is_processing = state.move_finder.is_some();
-                let start_count = get_vcount();
-
-                if FRAME_COUNTER.read() == expected_frame_counter {
-                    if let Some(finder) = &mut state.move_finder {
-                        while get_vcount() >= 160 {
-                            if finder.do_work().is_some() {
-                                break;
-                            }
+                if let Some(finder) = &mut state.move_finder {
+                    while get_vcount() >= 160 {
+                        if finder.do_work().is_some() {
+                            break;
                         }
-                        while get_vcount() < 160 {
-                            if finder.do_work().is_some() {
-                                break;
-                            }
+                    }
+                    while get_vcount() < 160 {
+                        if finder.do_work().is_some() {
+                            break;
                         }
                     }
                 }
-
-                let end_count = get_vcount();
-                expected_frame_counter = FRAME_COUNTER.read() + 1;
 
                 vblank.wait_for_vblank();
                 text_render.commit();
@@ -1194,26 +1173,6 @@ fn battle(gba: &mut agb::Gba) {
                 input.update();
 
                 state.frame(&object, &input, &mut mixer, &mut text_render);
-
-                if is_processing {
-                    let done_processing = state.move_finder.is_none();
-
-                    if done_processing {
-                        if processing_for_frames != 0 {
-                            agb::println!("Processed for {} frames", processing_for_frames);
-                        }
-                        processing_for_frames = 0;
-                    } else {
-                        processing_for_frames += 1;
-                    }
-
-                    // agb::println!(
-                    //     "Start: {}, end {}. Done: {}",
-                    //     start_count,
-                    //     end_count,
-                    //     done_processing
-                    // );
-                }
 
                 if input.is_just_pressed(Button::START) && state.winner.is_some() {
                     break;

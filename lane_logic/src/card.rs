@@ -1,8 +1,10 @@
 use crate::{Board, Direction, Index, PlaceStatus, Player, Position, PushStatus, Set};
 
 trait Card: Default + core::fmt::Debug + Clone {
-    fn push(board: &mut Board, self_index: Index, direction: Direction) -> Set<Index>;
-    fn can_push(board: &Board, self_index: Index, direction: Direction) -> PushStatus;
+    fn push(board: &mut Board, self_index: Index, direction: Direction, depth: usize)
+        -> Set<Index>;
+    fn can_push(board: &Board, self_index: Index, direction: Direction, depth: usize)
+        -> PushStatus;
     fn can_place(
         board: &Board,
         player: Player,
@@ -51,13 +53,13 @@ macro_rules! create_card_data{
         }
 
         impl $name {
-            fn pusher(&self) -> fn(&mut Board, Index, Direction) -> Set<Index> {
+            fn pusher(&self) -> fn(&mut Board, Index, Direction, usize) -> Set<Index> {
                 match self {
                     $( $name::$card_type(_) => $card_type::push),+
                 }
             }
 
-            fn can_pusher(&self) -> fn(&Board, Index, Direction) -> PushStatus {
+            fn can_pusher(&self) -> fn(&Board, Index, Direction, usize) -> PushStatus {
                 match self {
                     $( $name::$card_type(_) => $card_type::can_push),+
                 }
@@ -115,12 +117,22 @@ macro_rules! create_card_data{
 }
 
 impl CardData {
-    pub(crate) fn push(board: &mut Board, index: Index, direction: Direction) -> Set<Index> {
-        board[index].card.pusher()(board, index, direction)
+    pub(crate) fn push(
+        board: &mut Board,
+        index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> Set<Index> {
+        board[index].card.pusher()(board, index, direction, depth + 1)
     }
 
-    pub(crate) fn can_push(board: &Board, index: Index, direction: Direction) -> PushStatus {
-        board[index].card.can_pusher()(board, index, direction)
+    pub(crate) fn can_push(
+        board: &Board,
+        index: Index,
+        direction: Direction,
+        depth: usize,
+    ) -> PushStatus {
+        board[index].card.can_pusher()(board, index, direction, depth + 1)
     }
 }
 

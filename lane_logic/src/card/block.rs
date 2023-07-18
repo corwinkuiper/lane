@@ -6,11 +6,21 @@ use super::{normal::Normal, Card};
 pub struct Block {}
 
 impl Card for Block {
-    fn push(_board: &mut Board, _self_indexx: Index, _direction: Direction) -> Set<Index> {
+    fn push(
+        _board: &mut Board,
+        _self_indexx: Index,
+        _direction: Direction,
+        depth: usize,
+    ) -> Set<Index> {
         Set::new()
     }
 
-    fn can_push(_board: &Board, _self_index: Index, _direction: Direction) -> PushStatus {
+    fn can_push(
+        _board: &Board,
+        _self_index: Index,
+        _direction: Direction,
+        depth: usize,
+    ) -> PushStatus {
         PushStatus::Fail
     }
 

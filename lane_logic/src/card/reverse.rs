@@ -11,16 +11,18 @@ impl Card for Reverse {
         board: &mut crate::Board,
         self_index: crate::Index,
         direction: crate::Direction,
+        depth: usize,
     ) -> crate::Set<crate::Index> {
-        Normal::push(board, self_index, -direction)
+        Normal::push(board, self_index, -direction, depth)
     }
 
     fn can_push(
         board: &crate::Board,
         self_index: crate::Index,
         direction: crate::Direction,
+        depth: usize,
     ) -> crate::PushStatus {
-        Normal::can_push(board, self_index, direction)
+        Normal::can_push(board, self_index, -direction, depth)
     }
 
     fn can_place(
