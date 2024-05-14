@@ -1100,15 +1100,15 @@ fn battle(gba: &mut agb::Gba) {
             HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Redirect),
-            HeldCard::Avaliable(CardType::Reverse)
+            HeldCard::Avaliable(CardType::Ghost),
+            HeldCard::Avaliable(CardType::Double)
         ],
         alloc::vec![
             HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Redirect),
-            HeldCard::Avaliable(CardType::Reverse)
+            HeldCard::Avaliable(CardType::Ghost),
+            HeldCard::Avaliable(CardType::Double)
         ],
         Player::A,
     );
