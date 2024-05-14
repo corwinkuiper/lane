@@ -65,9 +65,9 @@ fn noop_clone(data: *const ()) -> RawWaker {
     RawWaker::new(data, &NOOP_VTABLE)
 }
 
-fn noop(data: *const ()) {}
+fn noop(_data: *const ()) {}
 
-pub fn yeild() -> impl Future<Output = ()> {
+pub fn defer() -> impl Future<Output = ()> {
     let mut done = false;
     poll_fn(move |_ctx| {
         if !done {

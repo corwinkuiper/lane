@@ -7,7 +7,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-agb = { version = "0.16", features = ["testing"] }
+agb = { version = "0.20" }
 slotmap = { version = "1.0", default-features = false }
 lane_logic = { path = "../lane_logic" }
 async-recursion = "1.0.2"

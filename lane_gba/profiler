@@ -1,3 +1,0 @@
-#!/bin/sh
-
-cargo run --release | grep -oE '0x[0-9a-f]+' | arm-none-eabi-addr2line -e target/thumbv4t-none-eabi/release/lane -fCrp | grep -v '?? ??:0' | sed -e 's/:[0-9?]*$//g' | awk '{a[$0] += 1}END{for(key in a) print a[key], key}' | sort -g

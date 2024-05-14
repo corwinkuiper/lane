@@ -11,17 +11,17 @@ use core::cell::RefCell;
 use agb::{
     display::{
         font::TextRenderer,
-        object::{Graphics, Object, ObjectController, Sprite, Tag},
+        object::{Graphics, OamManaged, Object, Sprite, Tag},
         tiled::{
-            DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileFormat, TileSetting,
-            TiledMap, VRamManager,
+            DynamicTile, MapLoan, RegularBackgroundSize, RegularMap, TileFormat, TiledMap,
+            VRamManager,
         },
         Font, Priority, HEIGHT, WIDTH,
     },
     fixnum::{Num, Rect, Vector2D},
     include_aseprite,
     input::{Button, ButtonController},
-    interrupt::{Interrupt, VBlank},
+    interrupt::VBlank,
     sound::mixer::{Frequency, Mixer, SoundChannel},
 };
 use alloc::vec::Vec;
@@ -45,7 +45,7 @@ const MIST_CITY: &[u8] = agb::include_wav!("sfx/mist_city.wav");
 
 extern crate alloc;
 
-const CARDS: &Graphics = include_aseprite!(
+static CARDS: &Graphics = include_aseprite!(
     "gfx/cards.aseprite",
     "gfx/arrow-right.aseprite",
     "gfx/arrow-down.aseprite",
@@ -53,22 +53,22 @@ const CARDS: &Graphics = include_aseprite!(
     "gfx/action.aseprite",
     "gfx/chevron.aseprite"
 );
-const CHEVRON: &Sprite = CARDS.tags().get("Chevron").sprite(0);
-const ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
-const ARROW_DOWN: &Sprite = CARDS.tags().get("Arrow Down").sprite(0);
+static CHEVRON: &Sprite = CARDS.tags().get("Chevron").sprite(0);
+static ARROW_RIGHT: &Sprite = CARDS.tags().get("Arrow Right").sprite(0);
+static ARROW_DOWN: &Sprite = CARDS.tags().get("Arrow Down").sprite(0);
 
-const REFRESH: &Sprite = CARDS.tags().get("Refresh Double").sprite(0);
+static REFRESH: &Sprite = CARDS.tags().get("Refresh Double").sprite(0);
 
-const SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
-const SELECT_DOUBLE: &Sprite = CARDS.tags().get("Select Double").sprite(0);
+static SELECT: &Sprite = CARDS.tags().get("Select").sprite(0);
+static SELECT_DOUBLE: &Sprite = CARDS.tags().get("Select Double").sprite(0);
 
-const PICK: &Tag = CARDS.tags().get("Pick");
-const PUSH: &Tag = CARDS.tags().get("Push");
+static PICK: &Tag = CARDS.tags().get("Pick");
+static PUSH: &Tag = CARDS.tags().get("Push");
 
 fn card_type_to_sprite(t: CardType) -> &'static Sprite {
     macro_rules! deconstify {
         ($t: expr) => {{
-            const A: &'static Tag = $t;
+            static A: &'static Tag = $t;
             A
         }};
     }
@@ -86,7 +86,7 @@ fn card_type_to_sprite(t: CardType) -> &'static Sprite {
 fn card_type_to_sprite_double(t: CardType) -> &'static Sprite {
     macro_rules! deconstify {
         ($t: expr) => {{
-            const A: &'static Tag = $t;
+            static A: &'static Tag = $t;
             A
         }};
     }
@@ -104,7 +104,7 @@ fn card_type_to_sprite_double(t: CardType) -> &'static Sprite {
 fn colour_for_player(t: Player) -> &'static Sprite {
     macro_rules! deconstify {
         ($t: expr) => {{
-            const A: &'static Tag = $t;
+            static A: &'static Tag = $t;
             A
         }};
     }
@@ -117,7 +117,7 @@ fn colour_for_player(t: Player) -> &'static Sprite {
 fn colour_for_player_double(t: Player) -> &'static Sprite {
     macro_rules! deconstify {
         ($t: expr) => {{
-            const A: &'static Tag = $t;
+            static A: &'static Tag = $t;
             A
         }};
     }
@@ -160,13 +160,13 @@ struct PickHelp<'controller> {
 }
 
 impl<'controller> PickHelp<'controller> {
-    fn new(object: &'controller ObjectController) -> Self {
+    fn new(object: &'controller OamManaged) -> Self {
         let mut pick = object.object_sprite(PICK.sprite(0));
-        pick.set_position((WIDTH - 32, 0).into());
+        pick.set_position((WIDTH - 32, 0));
         pick.set_z(-10);
 
         let mut push = object.object_sprite(PUSH.sprite(0));
-        push.set_position((0, 0).into());
+        push.set_position((0, 0));
         push.set_z(-10);
 
         Self { pick, push }
@@ -182,17 +182,17 @@ impl<'controller> PickHelp<'controller> {
         self.push.show();
     }
 
-    fn pick(&mut self, object: &'controller ObjectController) {
+    fn pick(&mut self, object: &'controller OamManaged) {
         self.pick.set_sprite(object.sprite(PICK.sprite(1)));
         self.push.set_sprite(object.sprite(PUSH.sprite(0)));
     }
 
-    fn push(&mut self, object: &'controller ObjectController) {
+    fn push(&mut self, object: &'controller OamManaged) {
         self.pick.set_sprite(object.sprite(PICK.sprite(0)));
         self.push.set_sprite(object.sprite(PUSH.sprite(1)));
     }
 
-    fn reset(&mut self, object: &'controller ObjectController) {
+    fn reset(&mut self, object: &'controller OamManaged) {
         self.pick.set_sprite(object.sprite(PICK.sprite(0)));
         self.push.set_sprite(object.sprite(PUSH.sprite(0)));
     }
@@ -212,7 +212,7 @@ impl<'controller> MyState<'controller> {
         average_position
     }
 
-    fn update_hand_objects(&mut self, object: &'controller ObjectController) {
+    fn update_hand_objects(&mut self, object: &'controller OamManaged) {
         self.hand.clear();
         let player = self.game_state.turn();
         let held_cards = self.game_state.turn_hand();
@@ -257,11 +257,7 @@ impl<'controller> MyState<'controller> {
         }
     }
 
-    fn new(
-        initial_state: State,
-        object: &'controller ObjectController,
-        control: ControlMode,
-    ) -> Self {
+    fn new(initial_state: State, object: &'controller OamManaged, control: ControlMode) -> Self {
         let mut state = MyState {
             cards: Default::default(),
             playing_animations: Default::default(),
@@ -302,7 +298,7 @@ impl<'controller> MyState<'controller> {
 
     fn frame(
         &mut self,
-        object: &'controller ObjectController,
+        object: &'controller OamManaged,
         input: &ButtonController,
         mixer: &mut Mixer,
         text: &mut TextRender,
@@ -442,7 +438,7 @@ impl<'controller> MyState<'controller> {
     fn do_ai_turn(
         &mut self,
         ai_mode: AIControl,
-        object: &'controller ObjectController,
+        object: &'controller OamManaged,
     ) -> Option<MoveResult> {
         self.select.object.hide();
         self.select.pick_box.hide();
@@ -472,7 +468,7 @@ impl<'controller> MyState<'controller> {
         &mut self,
         position_difference: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
-        object: &'controller ObjectController,
+        object: &'controller OamManaged,
         mixer: &mut Mixer,
     ) -> Option<MoveResult> {
         self.pick_help.show();
@@ -513,7 +509,7 @@ impl<'controller> MyState<'controller> {
         &mut self,
         position_difference: Vector2D<Num<i32, 8>>,
         input: &ButtonController,
-        controller: &'controller ObjectController,
+        controller: &'controller OamManaged,
         mixer: &mut Mixer,
     ) -> Option<Move> {
         let input_vector: Vector2D<i32> = input.just_pressed_vector();
@@ -530,7 +526,6 @@ impl<'controller> MyState<'controller> {
                     let slot = *slot;
 
                     if input.is_just_pressed(Button::A) {
-                        let slot = slot;
                         self.select
                             .state_stack
                             .push(SelectState::BoardSelectPosition {
@@ -695,11 +690,7 @@ impl<'controller> MyState<'controller> {
         None
     }
 
-    fn update_representation(
-        &mut self,
-        update: &MoveResult,
-        object: &'controller ObjectController,
-    ) {
+    fn update_representation(&mut self, update: &MoveResult, object: &'controller OamManaged) {
         // add the newly placed cards
         for (idx, direction, new_card) in &update.placed {
             self.cards.insert(
@@ -854,12 +845,6 @@ impl SelectBox<'_> {
             .last_mut()
             .expect("should have the last state available")
     }
-
-    fn state(&self) -> &SelectState {
-        self.state_stack
-            .last()
-            .expect("should have the last state available")
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -894,7 +879,6 @@ const CONVERSION_FACTOR: Vector2D<Num<i32, 8>> = Vector2D {
     x: Num::from_raw(16 << 8),
     y: Num::from_raw(16 << 8),
 };
-
 struct TextRender<'gfx> {
     bg: MapLoan<'gfx, RegularMap>,
     vram: &'gfx RefCell<VRamManager>,
@@ -912,7 +896,7 @@ impl<'gfx> TextRender<'gfx> {
             writers: Vec::new(),
         };
         tr.clear();
-        tr.bg.show();
+        tr.bg.set_visible(true);
         tr
     }
 
@@ -932,9 +916,9 @@ impl<'gfx> TextRender<'gfx> {
             for x in 0..30u16 {
                 self.bg.set_tile(
                     vram,
-                    (x, y).into(),
+                    (x, y),
                     &self.tile.tile_set(),
-                    TileSetting::from_raw(self.tile.tile_index()),
+                    self.tile.tile_setting(),
                 );
             }
         }
@@ -984,7 +968,7 @@ const MENU_OPTIONS: &[&str] = &[
 const MENU_X_START: u16 = 3;
 
 impl<'controller> Menu<'controller> {
-    fn new(object: &'controller ObjectController, text: &mut TextRender) -> Self {
+    fn new(object: &'controller OamManaged, text: &mut TextRender) -> Self {
         text.write(
             &FONT_15,
             (MENU_X_START, 2_u16).into(),
@@ -1019,8 +1003,8 @@ impl<'controller> Menu<'controller> {
 
         self.cursor
             .object_left
-            .set_position(((MENU_X_START as i32 - 2) * 8, y_pos).into());
-        self.cursor.object_right.set_position((x_pos, y_pos).into());
+            .set_position(((MENU_X_START as i32 - 2) * 8, y_pos));
+        self.cursor.object_right.set_position((x_pos, y_pos));
 
         self.cursor.object_left.show();
         self.cursor.object_right.show();
@@ -1085,7 +1069,7 @@ impl<'controller> Menu<'controller> {
 }
 
 fn battle(gba: &mut agb::Gba) {
-    let object = gba.display.object.get();
+    let object = gba.display.object.get_managed();
     let (gfx, mut vram) = gba.display.video.tiled0();
 
     vram.set_background_palette_raw(&[0x0000, 0xffff]);
@@ -1113,14 +1097,14 @@ fn battle(gba: &mut agb::Gba) {
 
     let game_state = State::new(
         alloc::vec![
-            HeldCard::Avaliable(CardType::Double),
+            HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Redirect),
             HeldCard::Avaliable(CardType::Reverse)
         ],
         alloc::vec![
-            HeldCard::Avaliable(CardType::Double),
+            HeldCard::Avaliable(CardType::Block),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Normal),
             HeldCard::Avaliable(CardType::Redirect),
@@ -1160,7 +1144,7 @@ fn battle(gba: &mut agb::Gba) {
                             break;
                         }
                     }
-                    while get_vcount() < 160 {
+                    while get_vcount() < 120 {
                         if finder.do_work().is_some() {
                             break;
                         }

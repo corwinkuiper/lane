@@ -4,32 +4,39 @@ version = 3
 
 [[package]]
 name = "agb_fixnum"
-version = "0.16.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01bece8a97318b45b1aea0ba3605486ec61b234fabc428cc3f94bcd74c9d4f9b"
+checksum = "e51f15ca6378ca3a6f892db1f1b9689501a5089d0edf1dc7b6faaed9cedb0330"
 dependencies = [
  "agb_macros",
+ "num-traits",
 ]
 
 [[package]]
 name = "agb_hashmap"
-version = "0.16.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa8e34f934d8d788a8ef5ca77a6328f0ae25bb8061813339c3f39e4855d2c524"
+checksum = "0db161a7494a3cce046296304218ba4fad870340bb3d365834efdaccbbf059de"
 dependencies = [
  "rustc-hash",
 ]
 
 [[package]]
 name = "agb_macros"
-version = "0.16.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b6abf418099c5e70b4b105035eb6819e51822a9685d489082aec75e698b41c9"
+checksum = "9daab648111b0d7f3079ead5d9aad2502c9c9454632791a91a4c4bd945238834"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "autocfg"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 
 [[package]]
 name = "lane_logic"
@@ -38,6 +45,15 @@ dependencies = [
  "agb_fixnum",
  "agb_hashmap",
  "slotmap",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use lane_logic::{Move, MoveResult, Player, State};
 
 use crate::async_evaluator::{self, Evaluator};
@@ -45,7 +45,7 @@ pub enum ControlMode {
     TwoAI(AIControl, AIControl),
 }
 
-fn calculate_state_score(result: &MoveResult, node: &State, current_turn: Player) -> i32 {
+fn calculate_state_score(result: &MoveResult, _node: &State, current_turn: Player) -> i32 {
     let mut score: i32 = 0;
 
     let alternate_turn = match current_turn {
@@ -70,7 +70,7 @@ fn calculate_state_score(result: &MoveResult, node: &State, current_turn: Player
     score
 }
 
-fn randomise_list<T>(items: &mut Vec<T>) {
+fn randomise_list<T>(items: &mut [T]) {
     // Randomise the move list
     for i in (1..items.len()).rev() {
         let j = agb::rng::gen() as usize % i;
@@ -84,14 +84,14 @@ async fn find_best_move(
     max_depth: u32,
 ) -> Option<Move> {
     let mut possible_moves = game_state
-        .enumerate_possible_moves_async(async_evaluator::yeild)
+        .enumerate_possible_moves_async(async_evaluator::defer)
         .await;
 
-    async_evaluator::yeild().await;
+    async_evaluator::defer().await;
 
     randomise_list(&mut possible_moves);
 
-    async_evaluator::yeild().await;
+    async_evaluator::defer().await;
 
     let player = game_state.turn();
 
@@ -104,10 +104,10 @@ async fn find_best_move(
 
     for move_to_check in possible_moves {
         let mut next_state = game_state.clone();
-        async_evaluator::yeild().await;
+        async_evaluator::defer().await;
         let result = next_state.execute_move(&move_to_check);
         let resultant_score = score_function.score(&result, &next_state, player);
-        async_evaluator::yeild().await;
+        async_evaluator::defer().await;
         let score = minimax(
             &score_function,
             next_state,
@@ -119,7 +119,7 @@ async fn find_best_move(
         )
         .await;
 
-        async_evaluator::yeild().await;
+        async_evaluator::defer().await;
 
         if score > best_score {
             best_move = Some((move_to_check, score, resultant_score));
@@ -129,7 +129,7 @@ async fn find_best_move(
         alpha = best_score.max(alpha);
     }
 
-    async_evaluator::yeild().await;
+    async_evaluator::defer().await;
 
     let (desired_move, _, _) = best_move.unwrap();
 
@@ -151,23 +151,23 @@ async fn minimax(
     }
 
     let mut possible_moves = node
-        .enumerate_possible_moves_async(async_evaluator::yeild)
+        .enumerate_possible_moves_async(async_evaluator::defer)
         .await;
 
-    async_evaluator::yeild().await;
+    async_evaluator::defer().await;
 
     randomise_list(&mut possible_moves);
 
-    async_evaluator::yeild().await;
+    async_evaluator::defer().await;
 
     if node.turn() == me {
         let mut best_evaluation = i32::MIN;
         for next_move in possible_moves {
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let mut next_node = node.clone();
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let next_move_result = next_node.execute_move(&next_move);
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let value_of_move = minimax(
                 score_function,
                 next_node,
@@ -188,11 +188,11 @@ async fn minimax(
     } else {
         let mut worst_evaluation = i32::MAX;
         for next_move in possible_moves {
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let mut next_node = node.clone();
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let next_move_result = next_node.execute_move(&next_move);
-            async_evaluator::yeild().await;
+            async_evaluator::defer().await;
             let value_of_move = minimax(
                 score_function,
                 next_node,
