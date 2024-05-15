@@ -226,7 +226,7 @@ impl<'controller> MyState<'controller> {
             let position = (first_x + 34 * count, HEIGHT - 34).into();
 
             match card_in_hand {
-                HeldCard::Avaliable(card) => {
+                HeldCard::Available(card) => {
                     let mut held = CardInHand {
                         card_object: object.object_sprite(card_type_to_sprite_double(*card)),
                         colour_object: object.object_sprite(colour_for_player_double(player)),
@@ -1097,18 +1097,18 @@ fn battle(gba: &mut agb::Gba) {
 
     let game_state = State::new(
         alloc::vec![
-            HeldCard::Avaliable(CardType::Block),
-            HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Ghost),
-            HeldCard::Avaliable(CardType::Double)
+            HeldCard::Available(CardType::Block),
+            HeldCard::Available(CardType::Normal),
+            HeldCard::Available(CardType::Normal),
+            HeldCard::Available(CardType::Ghost),
+            HeldCard::Available(CardType::Double)
         ],
         alloc::vec![
-            HeldCard::Avaliable(CardType::Block),
-            HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Normal),
-            HeldCard::Avaliable(CardType::Ghost),
-            HeldCard::Avaliable(CardType::Double)
+            HeldCard::Available(CardType::Block),
+            HeldCard::Available(CardType::Normal),
+            HeldCard::Available(CardType::Normal),
+            HeldCard::Available(CardType::Ghost),
+            HeldCard::Available(CardType::Double)
         ],
         Player::A,
     );

@@ -46,10 +46,6 @@ macro_rules! create_card_data{
                     $( $name::$card_type(_) => $type_name::$card_type),+
                 }
             }
-
-            fn is_of_type(&self, card_type: $type_name) -> bool {
-                self.to_type() == card_type
-            }
         }
 
         impl $name {
@@ -91,7 +87,10 @@ macro_rules! create_card_data{
 
         }
 
-        $( impl $card_type {
+        // used by some but not by others
+
+        $( #[allow(dead_code)]
+        impl $card_type {
 
             fn get_self_mut(board: &mut Board, self_idx: Index) -> &mut $card_type {
                 match &mut board[self_idx].card {

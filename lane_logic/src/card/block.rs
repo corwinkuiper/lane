@@ -10,7 +10,7 @@ impl Card for Block {
         _board: &mut Board,
         _self_indexx: Index,
         _direction: Direction,
-        depth: usize,
+        _depth: usize,
     ) -> Set<Index> {
         Set::new()
     }
@@ -19,7 +19,7 @@ impl Card for Block {
         _board: &Board,
         _self_index: Index,
         _direction: Direction,
-        depth: usize,
+        _depth: usize,
     ) -> PushStatus {
         PushStatus::Fail
     }

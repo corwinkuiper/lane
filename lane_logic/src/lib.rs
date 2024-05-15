@@ -125,7 +125,7 @@ pub struct State {
 
 #[derive(Debug, Clone)]
 pub enum HeldCard {
-    Avaliable(CardType),
+    Available(CardType),
     Waiting {
         card: CardType,
         turns_until_usable: usize,
@@ -151,7 +151,7 @@ impl State {
     pub fn can_execute_move(&self, m: &Move) -> bool {
         match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
-                HeldCard::Avaliable(card) => {
+                HeldCard::Available(card) => {
                     self.board
                         .no_cards_in_direction(place.coordinate, -place.direction)
                         && self.board.get_card_position(place.coordinate).is_none()
@@ -182,7 +182,7 @@ impl State {
     pub fn execute_move(&mut self, m: &Move) -> MoveResult {
         let (placed, moved, mut picked) = match m {
             Move::PlaceCard(place) => match self.hands[self.turn as usize].cards[place.card.0] {
-                HeldCard::Avaliable(card) => {
+                HeldCard::Available(card) => {
                     self.hands[self.turn as usize].cards.remove(place.card.0);
 
                     let (new_card, moved_cards) =
@@ -218,14 +218,14 @@ impl State {
 
         for card_in_hand in self.hands.iter_mut().flat_map(|x| x.cards.iter_mut()) {
             match card_in_hand {
-                HeldCard::Avaliable(_) => {}
+                HeldCard::Available(_) => {}
                 HeldCard::Waiting {
                     card,
                     turns_until_usable,
                 } => {
                     *turns_until_usable -= 1;
                     if *turns_until_usable == 0 {
-                        *card_in_hand = HeldCard::Avaliable(*card);
+                        *card_in_hand = HeldCard::Available(*card);
                     }
                 }
             }
@@ -323,7 +323,7 @@ impl State {
 
         // go over the hand of the current player
         for (idx, card) in self.turn_hand().iter().enumerate() {
-            if let HeldCard::Avaliable(_card) = card {
+            if let HeldCard::Available(_card) = card {
                 for (position, direction) in possible.iter().copied() {
                     moves.push(Move::PlaceCard(PlaceCardMove {
                         direction,
@@ -356,7 +356,7 @@ impl State {
         moves
     }
 
-    pub async fn enumerate_possible_moves_async<F, Fut>(&self, yeild: F) -> Vec<Move>
+    pub async fn enumerate_possible_moves_async<F, Fut>(&self, defer: F) -> Vec<Move>
     where
         F: Fn() -> Fut,
         Fut: Future<Output = ()>,
@@ -372,24 +372,24 @@ impl State {
                 if self.board.no_cards_in_direction(card.position, direction) {
                     possible.push((desired_spot, -direction));
                 }
-                yeild().await;
+                defer().await;
             }
         }
 
         // go over the hand of the current player
         for (idx, card) in self.turn_hand().iter().enumerate() {
-            if let HeldCard::Avaliable(_card) = card {
+            if let HeldCard::Available(_card) = card {
                 for (position, direction) in possible.iter().copied() {
                     moves.push(Move::PlaceCard(PlaceCardMove {
                         direction,
                         coordinate: position,
                         card: HeldCardIndex(idx),
                     }));
-                    yeild().await;
+                    defer().await;
                 }
             }
         }
-        yeild().await;
+        defer().await;
 
         // all possible pushing moves
         for (idx, card) in self.board.positions.iter() {
@@ -397,7 +397,7 @@ impl State {
                 continue;
             }
 
-            yeild().await;
+            defer().await;
 
             moves.push(Move::PickCard(PickCardMove { card: Index(idx) }));
 
@@ -409,7 +409,7 @@ impl State {
                 if self.can_execute_move(&m) {
                     moves.push(m);
                 }
-                yeild().await;
+                defer().await;
             }
         }
 
@@ -530,8 +530,7 @@ impl Board {
     }
 
     fn remove_card(&mut self, idx: Index) -> PlacedCard {
-        let card = self.positions.remove(idx.0).unwrap();
-        card
+        self.positions.remove(idx.0).unwrap()
     }
 
     fn add_card(&mut self, owner: Player, position: Position, card: CardData) -> Index {
